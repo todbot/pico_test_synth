@@ -13396,8 +13396,6 @@ by exp-project-lbr.ulp</description>
 <approved hash="106,1,63.5,187.96,N$4,,,,,"/>
 <approved hash="106,1,63.5,195.58,N$5,,,,,"/>
 <approved hash="106,1,63.5,198.12,N$6,,,,,"/>
-<approved hash="106,1,63.5,165.1,N$53,,,,,"/>
-<approved hash="106,1,63.5,172.72,NEOPIXEL,,,,,"/>
 <approved hash="113,1,139.596,107.846,FRAME1,,,,,"/>
 </errors>
 </schematic>
