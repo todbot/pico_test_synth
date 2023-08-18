@@ -35,17 +35,16 @@ filter_freq = 4000
 filter_resonance = 1.2
 
 # pin definitions
-pwm_audio_pin = board.GP22
-sw_pin = board.GP28
-knobB_pin  = board.GP27
-knobA_pin  = board.GP26
-i2s_data_pin = board.GP22
-i2s_lclk_pin = board.GP21
-i2s_bclk_pin = board.GP20
-i2c_scl_pin = board.GP19
-i2c_sda_pin = board.GP18
-uart_rx_pin = board.GP17
-uart_tx_pin = board.GP16
+sw_pin        = board.GP28
+knobB_pin     = board.GP27
+knobA_pin     = board.GP26
+i2s_data_pin  = board.GP22
+i2s_lclk_pin  = board.GP21
+i2s_bclk_pin  = board.GP20
+i2c_scl_pin   = board.GP19
+i2c_sda_pin   = board.GP18
+uart_rx_pin   = board.GP17
+uart_tx_pin   = board.GP16
 
 touch_pins = (
     board.GP0, board.GP1, board.GP2, board.GP3, board.GP4, board.GP5,

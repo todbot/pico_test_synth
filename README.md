@@ -8,7 +8,7 @@ synth to experiment with [`synthio`](https://github.com/todbot/circuitpython-syn
 
 video demo: https://www.youtube.com/watch?v=9U2Dn7ckdbs
 
-[Available soon on Tindie](https://www.tindie.com/products/todbot/pico_test_synth/)
+** [Available on Tindie](https://www.tindie.com/products/todbot/pico_test_synth/) **
 
 ### Features
 
@@ -42,15 +42,16 @@ More code specific for this board coming!
 
 The board uses all of the QTPy RP2040 pins:
 
-* `board.GP26` - left knob
-* `board.GP27` - right knob
 * `board.GP28` - middle button
-* `board.GP17` - TRS UART MIDI in
-* `board.GP18` - TRS UART MIDI out
-* `board.GP20` - I2S bit clock
-* `board.GP21` - I2S LR  clock
+* `board.GP27` - right knob
+* `board.GP26` - left knob
 * `board.GP22` - I2S data
-* `board.GP19` & `board.GP18` - I2C bus for OLED display
+* `board.GP21` - I2S LR  clock
+* `board.GP20` - I2S bit clock
+* `board.GP19` - I2C SCL for OLED display
+* `board.GP18` - I2C SDA for OLED display
+* `board.GP17` - TRS UART MIDI in
+* `board.GP16` - TRS UART MIDI out
 * `board.GP0`..`board.GP15` -- touch pads 1-16
 
 For more details see [`hwtest/code.py`](https://github.com/todbot/pico_test_synth/tree/main/circuitpython/hwtest/code.py).
