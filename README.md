@@ -6,6 +6,8 @@ synth to experiment with [`synthio`](https://github.com/todbot/circuitpython-syn
 <img src="./docs/pico_test_synth1.jpg" width=500>
 <img src="./docs/pico_test_synth2.jpg" width=500>
 
+video demo: https://www.youtube.com/watch?v=9U2Dn7ckdbs
+
 ### Features
 
 * [PCM5102 I2S DAC](https://todbot.com/blog/2023/05/16/cheap-stereo-line-out-i2s-dac-for-circuitpython-arduino-synths/) footprint for high-quality stereo audio out
@@ -24,6 +26,7 @@ will work with this board too with minimal changes.
 Some programs written specifically for this board:
 
 * [hwtest](https://github.com/todbot/pico_test_synth/tree/main/circuitpython/hwtest/code.py) - test out the hardware with a simple synth
+  * [video demo](https://www.youtube.com/watch?v=9U2Dn7ckdbs)
 
 More code specific for this board coming!
 
