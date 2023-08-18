@@ -8,6 +8,8 @@ synth to experiment with [`synthio`](https://github.com/todbot/circuitpython-syn
 
 video demo: https://www.youtube.com/watch?v=9U2Dn7ckdbs
 
+[Available soon on Tindie](https://www.tindie.com/products/todbot/pico_test_synth/)
+
 ### Features
 
 * [PCM5102 I2S DAC](https://todbot.com/blog/2023/05/16/cheap-stereo-line-out-i2s-dac-for-circuitpython-arduino-synths/) footprint for high-quality stereo audio out
