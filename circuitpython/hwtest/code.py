@@ -167,5 +167,5 @@ async def main():  # Don't forget the async!
     task3 = asyncio.create_task(uart_handler())
     await asyncio.gather(task1,task2,task3)
 
-print("hello qtpy_synth hwtest")
+print("hello pico_test_synth hwtest")
 asyncio.run(main())
