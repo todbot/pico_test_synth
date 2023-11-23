@@ -14,13 +14,13 @@ import analogio, keypad
 import touchio
 from adafruit_debouncer import Debouncer
 import neopixel
-import audiopwmio, audiomixer
+import audiopwmio, audiomixer, audiobusio
 import synthio
 import displayio
 import adafruit_displayio_ssd1306
 
 SAMPLE_RATE = 25600   # lets try powers of two
-MIXER_BUFFER_SIZE = 2048
+MIXER_BUFFER_SIZE = 4096
 DW,DH = 128, 64  # display width/height
 
 # pin definitions
@@ -42,13 +42,10 @@ touch_pins = (
     board.GP12, board.GP13, board.GP14, board.GP15 )
 
 
-# note: we're hanging on to some of the interstitial objects like 'i2c' & 'display_bus'
-# even though we shouldn't, because I think the gc will collect it unless we hold on to it
-
 class PicoTestSynthHardware():
     def __init__(self):
         self.led = neopixel.NeoPixel(led_pin, 1, brightness=0.1)
-        self.keys = keypad.Keys( pins=sw_pin,  value_when_pressed=False )
+        self.keys = keypad.Keys( pins=(sw_pin,),  value_when_pressed=False )
         self._knobA = analogio.AnalogIn(knobA_pin)
         self._knobB = analogio.AnalogIn(knobB_pin)
         self.knobA = self._knobA.value
@@ -67,13 +64,48 @@ class PicoTestSynthHardware():
         displayio.release_displays()
         i2c = busio.I2C(scl=i2c_scl_pin, sda=i2c_sda_pin, frequency=400_000 )
         display_bus = displayio.I2CDisplay(i2c, device_address=0x3c )
-        self.display = adafruit_displayio_ssd1306.SSD1306(display_bus, width=DW,height=DH, rotation=180)
+        self.display = adafruit_displayio_ssd1306.SSD1306(display_bus,
+                                                          width=DW, height=DH, rotation=180)
 
-        # now do audio setup so we have minimal audible glitches
-        audio = audiobusio.I2SOut(bit_clock=i2s_bclk_pin, word_select=i2s_lclk_pin, data=i2s_data_pin)
+        # now do audio setup (after display) so we have minimal audible glitches
+        self.audio = audiobusio.I2SOut(bit_clock=i2s_bclk_pin,
+                                       word_select=i2s_lclk_pin,
+                                       data=i2s_data_pin)
         self.mixer = audiomixer.Mixer(sample_rate=SAMPLE_RATE, voice_count=1, channel_count=1,
                                      bits_per_sample=16, samples_signed=True,
                                      buffer_size=MIXER_BUFFER_SIZE)
         self.synth = synthio.Synthesizer(sample_rate=SAMPLE_RATE)
         self.audio.play(self.mixer)
         self.mixer.voice[0].play(self.synth)
+
+    def check_key(self):
+        return self.keys.events.get()
+
+    def check_touch(self):
+        """Check the four touch inputs, return keypad-like Events"""
+        events = []
+        for i,touch in enumerate(self.touches):
+            touch.update()
+            if touch.rose:
+                events.append(keypad.Event(i,True))
+            elif touch.fell:
+                events.append(keypad.Event(i,False))
+        return events
+
+    def read_pots(self):
+        """Read the knobs, filter out their noise """
+        filt = 0.5
+
+        # avg_cnt = 5
+        # knobA_vals = [self.knobA] * avg_cnt
+        # knobB_vals = [self.knobB] * avg_cnt
+        # for i in range(avg_cnt):
+        #     knobA_vals[i] = self._knobA.value
+        #     knobB_vals[i] = self._knobB.value
+
+        # self.knobA = filt * self.knobA + (1-filt)*(sum(knobA_vals)/avg_cnt)  # filter noise
+        # self.knobB = filt * self.knobB + (1-filt)*(sum(knobB_vals)/avg_cnt)  # filter noise
+
+        self.knobA = filt * self.knobA + (1-filt)*(self._knobA.value)  # filter noise
+        self.knobB = filt * self.knobB + (1-filt)*(self._knobB.value)  # filter noise
+        return (int(self.knobA), int(self.knobB))
