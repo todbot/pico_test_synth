@@ -1,8 +1,8 @@
-# qtpy_synth_hwtest_code.py -- test hardware of qtpy_synth board
+# pico_test_synth_hwtest_code.py -- test hardware of qtpy_synth board
 # 27 Jun 2023 - @todbot / Tod Kurt
 #
 # Functionality:
-# - touch pads 1,2,3,4 trigger synth notes (defined in 'midi_notes')
+# - touch pads to trigger synth notes (defined in 'midi_notes')
 # - middle button triggers random synth notes
 # - left knob controls filter cutoff
 # - right knob controls filter resonance
@@ -21,13 +21,14 @@ import asyncio
 import time, random
 import board, busio
 import analogio, keypad
-import audiopwmio, audiobusio, audiomixer, synthio
+import audiobusio, audiomixer, synthio
 import ulab.numpy as np
 import displayio, terminalio
 import adafruit_displayio_ssd1306
 from adafruit_display_text import bitmap_label as label
 import touchio
 from adafruit_debouncer import Debouncer
+import usb_midi
 
 #midi_notes = (33, 45, 52, 57)
 midi_notes = list(range(45,45+16))
@@ -70,7 +71,8 @@ for pin in touch_pins:
     touchs.append( Debouncer(touchin) )
 
 
-uart = busio.UART(rx=uart_rx_pin, tx=uart_tx_pin, baudrate=31250, timeout=0.001)
+midi_in_usb = usb_midi.ports[0]
+midi_in_uart = busio.UART(rx=uart_rx_pin, tx=uart_tx_pin, baudrate=31250, timeout=0.001)
 i2c = busio.I2C(scl=i2c_scl_pin, sda=i2c_sda_pin, frequency=1_000_000 )
 
 dw,dh = 128, 64
@@ -95,9 +97,9 @@ synth.envelope = amp_env
 # set up info to be displayed
 maingroup = displayio.Group()
 display.show(maingroup)
-text1 = label.Label(terminalio.FONT, text="helloworld...", x=0, y=10)
+text1 = label.Label(terminalio.FONT, text="pico_test_synth", x=0, y=10)
 text2 = label.Label(terminalio.FONT, text="@todbot", x=0, y=25)
-text3 = label.Label(terminalio.FONT, text="hwtest. press!", x=0, y=50)
+text3 = label.Label(terminalio.FONT, text="pico_test_synth!", x=0, y=50)
 for t in (text1, text2, text3):
     maingroup.append(t)
 
@@ -120,11 +122,20 @@ def check_touch():
             synth.release( touch_notes[i] )
 
 async def debug_printer():
+    t1_last = ""
+    t2_last = ""
     while True:
-        text1.text = "K:%3d %3d S:%d" % (knobA.value//255, knobB.value//255, sw_pressed)
-        text2.text = "T:" + ''.join(["%3d " % v for v in (touchins[0].raw_value//16, touchins[1].raw_value//16, touchins[2].raw_value//16, touchins[3].raw_value//16)])
+        t1 = "K:%3d %3d S:%d" % (knobA.value//255, knobB.value//255, sw_pressed)
+        t2 = "T:" + ''.join('%1d' % t.value for t in touchins)
+        if t1 != t1_last:
+            t1_last = t1
+            text1.text = t1  # only change screen when we need to
+        if t2 != t2_last:
+            t2_last = t2
+            text2.text = t2
         print(text1.text)
         print(text2.text)
+        print("T:" + ''.join(["%3d " % (t.raw_value//16) for t in touchins[0:4]]))
         await asyncio.sleep(0.3)
 
 async def input_handler():
@@ -154,17 +165,29 @@ async def input_handler():
                 synth.press(note)
         await asyncio.sleep(0.005)
 
-async def uart_handler():
+async def midi_handler():
     while True:
-        while msg := uart.read(3):
-            print("midi:", [hex(b) for b in msg])
+        while msg := midi_in_uart.read(3):
+            print("midi in uart:", [hex(b) for b in msg])
+            if msg[0] == 0x90:  # note on
+                synth.press( msg[1] )
+            elif msg[0] == 0x80: # note off
+                synth.release( msg[1] )
+
+        while msg := midi_in_usb.read(3):
+            print("midi in usb:", [hex(b) for b in msg])
+            if msg[0] == 0x90:  # note on
+                synth.press( msg[1] )
+            elif msg[0] == 0x80: # note off
+                synth.release( msg[1] )
+
         await asyncio.sleep(0)
 
 # main coroutine
 async def main():  # Don't forget the async!
     task1 = asyncio.create_task(debug_printer())
     task2 = asyncio.create_task(input_handler())
-    task3 = asyncio.create_task(uart_handler())
+    task3 = asyncio.create_task(midi_handler())
     await asyncio.gather(task1,task2,task3)
 
 print("hello pico_test_synth hwtest")
