@@ -1,5 +1,5 @@
-# pico_test_synth_hwtest_code.py -- test hardware of qtpy_synth board
-# 27 Jun 2023 - @todbot / Tod Kurt
+# pico_test_synth_hwtest_code.py -- test hardware of pico_test_synth board
+# 27 Jun 2023 - 15 Feb 2024 - @todbot / Tod Kurt
 #
 # Functionality:
 # - touch pads to trigger synth notes (defined in 'midi_notes')
@@ -34,6 +34,7 @@ import usb_midi
 midi_notes = list(range(45,45+16))
 filter_freq = 4000
 filter_resonance = 1.2
+output_volume = 0.75 # turn down the volume a bit since this can get loud
 
 # pin definitions
 sw_pin        = board.GP28
@@ -68,29 +69,29 @@ for pin in touch_pins:
     touchin = touchio.TouchIn(pin)
     touchin.threshold = int(touchin.threshold * 1.05)
     touchins.append(touchin)
-    touchs.append( Debouncer(touchin) )
+    touchs.append(Debouncer(touchin))
 
 
 midi_in_usb = usb_midi.ports[0]
 midi_in_uart = busio.UART(rx=uart_rx_pin, tx=uart_tx_pin, baudrate=31250, timeout=0.001)
-i2c = busio.I2C(scl=i2c_scl_pin, sda=i2c_sda_pin, frequency=1_000_000 )
+i2c = busio.I2C(scl=i2c_scl_pin, sda=i2c_sda_pin, frequency=1_000_000)
 
 dw,dh = 128, 64
-display_bus = displayio.I2CDisplay(i2c, device_address=0x3c )
+display_bus = displayio.I2CDisplay(i2c, device_address=0x3c)
 display = adafruit_displayio_ssd1306.SSD1306(display_bus, width=dw, height=dh, rotation=180)
 
 # set up the synth->audio system
 audio = audiobusio.I2SOut(bit_clock=i2s_bclk_pin, word_select=i2s_lclk_pin, data=i2s_data_pin)
 mixer = audiomixer.Mixer(voice_count=1, sample_rate=28000, channel_count=1,
                          bits_per_sample=16, samples_signed=True,
-                         buffer_size=8192)  # buffer_size=4096)  # need a big buffer when screen updated
+                         buffer_size=4096)  # buffer_size=4096)  # need a big buffer when screen updated
 synth = synthio.Synthesizer(sample_rate=28000)
 audio.play(mixer)
-mixer.voice[0].level = 0.75 # turn down the volume a bit since this can get loud
+mixer.voice[0].level = output_volume
 mixer.voice[0].play(synth)
 
 # set up the synth
-wave_saw = np.linspace(30000,-30000, num=256, dtype=np.int16)  # default squ is too clippy
+wave_saw = np.linspace(20000,-20000, num=512, dtype=np.int16)  # default squ is too clippy
 amp_env = synthio.Envelope(sustain_level=0.8, release_time=0.4, attack_time=0.001)
 synth.envelope = amp_env
 
@@ -163,7 +164,7 @@ async def input_handler():
                 f = synthio.midi_to_hz(random.randint(32,60))
                 note = synthio.Note(frequency=f, waveform=wave_saw) # , filter=filter)
                 synth.press(note)
-        await asyncio.sleep(0.005)
+        await asyncio.sleep(0.001)
 
 async def midi_handler():
     while True:
