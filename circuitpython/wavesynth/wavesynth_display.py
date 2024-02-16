@@ -120,7 +120,7 @@ class WavesynthDisplay:
         if self.disp_line4[0].text != filt_q:
             self.disp_line4[0].text = filt_q
         if self.disp_line4[1].text != filt_env:
-            print("!")
+            #print("!")
             self.disp_line4[1].text = filt_env
 
     # utility methods for dealing with these "wave_selects" I've gotten myself into

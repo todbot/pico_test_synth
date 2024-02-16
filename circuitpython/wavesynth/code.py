@@ -116,7 +116,10 @@ async def input_handler():
     knob_saves = [(0, 0) for _ in range(4)]  # list of knob state pairs
     param_saves = [(0, 0) for _ in range(4)]  # list of param pairs for knobs
     knobA_pickup, knobB_pickup = False, False
-    knobA, knobB = 0, 0
+    
+    for i in range(len(knob_saves)):
+        knob_saves[i] = hw.read_pots()
+    knobA, knobB = hw.read_pots()
 
     def reload_patch(wave_select):
         print("reload patch!", wave_select)
@@ -131,17 +134,15 @@ async def input_handler():
     while True:
         # KNOB input
         (knobA_new, knobB_new) = hw.read_pots()
-
-        # simple knob pickup logic: if the real knob is close enough to
-        if abs(knobA - knobA_new) <= 1000:  # knobs range 0-65535
+        
+        # # simple knob pickup logic: if the real knob is close enough to
+        if abs(knobA - knobA_new) < 1000:  # knobs range 0-65535
             knobA_pickup = True
         if abs(knobB - knobB_new) <= 1000:
             knobB_pickup = True
 
-        if knobA_pickup:
-            knobA = knobA_new
-        if knobB_pickup:
-            knobB = knobB_new
+        knobA = knobA_new if knobA_pickup else knobA
+        knobB = knobB_new if knobB_pickup else knobB
 
         # TOUCH input
         if touches := hw.check_touch():
@@ -188,11 +189,8 @@ async def input_handler():
 
             wave_select_pos, wave_mix = param_saves[knob_mode]
 
-            if knobA_pickup:
-                wave_select_pos = map_range(knobA, 0, 65535,
-                                            0, len(wavedisp.wave_selects)-1)
-            if knobB_pickup:
-                wave_mix = map_range(knobB, 0,  65535, 0, 1)
+            wave_select_pos = map_range(knobA, 0, 65535, 0, len(wavedisp.wave_selects)-1)
+            wave_mix = map_range(knobB, 0,  65535, 0, 1)
 
             param_saves[knob_mode] = wave_select_pos, wave_mix
 
@@ -207,10 +205,9 @@ async def input_handler():
 
             detune, wave_lfo = param_saves[knob_mode]
 
-            if knobA_pickup:   # 300-65300 because RP2040 has bad ADC
-                detune = map_range(knobA, 300, 65300, 1, 1.1)
-            if knobB_pickup:
-                wave_lfo = map_range(knobB, 0, 65535, 0, 1)
+            # 300-65300 because RP2040 has bad ADC
+            detune = map_range(knobA, 300, 65300, 1, 1.1)
+            wave_lfo = map_range(knobB, 0, 65535, 0, 1)
 
             param_saves[knob_mode] = detune, wave_lfo
 
@@ -220,10 +217,8 @@ async def input_handler():
         elif knob_mode == 2:  # filter type and filter freq
             filt_type, filt_f = param_saves[knob_mode]
 
-            if knobA_pickup:
-                filt_type = int(map_range(knobA, 0, 65535, 0, 3))
-            if knobB_pickup:
-                filt_f = map_range(knobB, 300, 65300, 100, 8000)
+            filt_type = int(map_range(knobA, 0, 65535, 0, 3))
+            filt_f = map_range(knobB, 300, 65300, 100, 8000)
 
             param_saves[knob_mode] = filt_type, filt_f
 
@@ -233,10 +228,8 @@ async def input_handler():
         elif knob_mode == 3:
             filt_q, filt_env = param_saves[knob_mode]
 
-            if knobA_pickup:
-                filt_q = map_range(knobA, 0, 65535, 0.5, 2.5)
-            if knobB_pickup:
-                filt_env = map_range(knobB, 300, 65300, 1, 0.01)
+            filt_q = map_range(knobA, 0, 65535, 0.5, 2.5)
+            filt_env = map_range(knobB, 300, 65300, 1, 0.01)
 
             param_saves[knob_mode] = filt_q, filt_env
 
