@@ -172,14 +172,14 @@ async def midi_handler():
             print("midi in uart:", [hex(b) for b in msg])
             if msg[0] == 0x90:  # note on
                 synth.press( msg[1] )
-            elif msg[0] == 0x80: # note off
+            elif msg[0] == 0x80 or msg[0] == 0x90 and msg[2] ==0: # note off
                 synth.release( msg[1] )
 
         while msg := midi_in_usb.read(3):
             print("midi in usb:", [hex(b) for b in msg])
             if msg[0] == 0x90:  # note on
                 synth.press( msg[1] )
-            elif msg[0] == 0x80: # note off
+            elif msg[0] == 0x80 or msg[0] == 0x90 and msg[2] ==0: # note off
                 synth.release( msg[1] )
 
         await asyncio.sleep(0)
