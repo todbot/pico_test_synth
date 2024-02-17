@@ -2,6 +2,12 @@
 # 15 Feb 2024 - @todbot / Tod Kurt
 # part of https://github.com/todbot/pico_test_synth
 #
+# To install:
+#  - Copy files in 'pico_test_synth/circuitpython/wavesynth' dir to CIRCUITPY
+#  - Copy files in 'pico_test-synth/circuitpython/lib' to CIRCUITPY/lib
+#  - Install third-party libraries with circup
+#  - See https://github.com/todbot/pico_test_synth/blob/main/circuitpython/README.md
+#
 #  UI:
 #  - Display shows four lines of two parameters each
 #  - The current editable parameter pair is underlined, adjustable by the knobs
