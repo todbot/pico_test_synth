@@ -29,6 +29,7 @@ Some programs written specifically for this board:
 
 * [hwtest](https://github.com/todbot/pico_test_synth/tree/main/circuitpython/hwtest/code.py) - test out the hardware with a simple synth
   * [video demo](https://www.youtube.com/watch?v=9U2Dn7ckdbs)
+* [wavesynth](https://github.com/todbot/pico_test_synth/tree/main/circuitpython/wavesynth/) - port of wavesynth for qtpy_synth board with some improvements
 
 More code specific for this board coming!
 
