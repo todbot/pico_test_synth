@@ -19,6 +19,7 @@ import adafruit_displayio_ssd1306
 
 SAMPLE_RATE = 25600   # lets try powers of two
 MIXER_BUFFER_SIZE = 4096
+CHANNEL_COUNT = 1
 DW,DH = 128, 64  # display width/height
 
 # pin definitions
@@ -39,10 +40,10 @@ touch_pins = (board.GP0, board.GP1, board.GP2, board.GP3,
               board.GP12, board.GP13, board.GP14, board.GP15)
 
 class Hardware():
-    def __init__(self):
+    def __init__(self, sample_rate=SAMPLE_RATE, buffer_size=MIXER_BUFFER_SIZE):
 
         self.led = pwmio.PWMOut(led_pin)
-        self.keys = keypad.Keys( pins=(sw_pin,), value_when_pressed=False)
+        self.buttons = keypad.Keys( pins=(sw_pin,), value_when_pressed=False)
         self._knobA = analogio.AnalogIn(knobA_pin)
         self._knobB = analogio.AnalogIn(knobB_pin)
         self.knobA = self._knobA.value
@@ -70,19 +71,20 @@ class Hardware():
         self.audio = audiobusio.I2SOut(bit_clock=i2s_bclk_pin,
                                        word_select=i2s_lclk_pin,
                                        data=i2s_data_pin)
-        self.mixer = audiomixer.Mixer(sample_rate=SAMPLE_RATE,
-                                      voice_count=1, channel_count=1,
+        self.mixer = audiomixer.Mixer(sample_rate=sample_rate, voice_count=1,
+                                      channel_count=CHANNEL_COUNT,
                                       bits_per_sample=16, samples_signed=True,
-                                      buffer_size=MIXER_BUFFER_SIZE)
-        self.synth = synthio.Synthesizer(sample_rate=SAMPLE_RATE)
+                                      buffer_size=buffer_size)
+        self.synth = synthio.Synthesizer(sample_rate=sample_rate,
+                                         channel_count=CHANNEL_COUNT)
         self.audio.play(self.mixer)
         self.mixer.voice[0].play(self.synth)
 
     def set_volume(self,v):
         self.mixer.voice[0].level = v
 
-    def check_key(self):
-        return self.keys.events.get()
+    def check_button(self):
+        return self.buttons.events.get()
 
     def set_led(self,v):
         self.led.duty_cycle = (v & 255) * 255  # only use B of RGB, if RGB

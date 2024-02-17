@@ -1,6 +1,6 @@
-# wavesynth_display.py -- wavesynth display management for qtpy_synth
-# 28 Jul 2023 - @todbot / Tod Kurt
-# part of https://github.com/todbot/qtpy_synth
+# wavesynth_display.py -- wavesynth display management for pico_test_synth
+# 28 Jul 2023 - 16 Feb 2024 - @todbot / Tod Kurt
+# part of https://github.com/todbot/pico_test_synth
 
 import os
 import displayio, terminalio, vectorio
@@ -18,11 +18,12 @@ class WavesynthDisplay:
     def __init__(self, display, patch):
         self.display = display
         self.patch = patch
-        self.selected_info = 0 # which part of the display is currently selected
+        self.selected_info = 0  # which part of the display currently selected
+        self.max_lines = 5
         self.update_wave_selects()
         self.display_setup()
         self.display_update()
-        print("WavesynthDisplay:init: patch=",patch)
+        print("WavesynthDisplay:init: patch=", patch)
 
     def display_setup(self):
         disp_group = displayio.Group()
@@ -34,11 +35,14 @@ class WavesynthDisplay:
         ldetune  = label.Label(terminalio.FONT, text="-", x=2, y=19)
         lwave_lfo= label.Label(terminalio.FONT, text="-", x=75, y=19)
 
-        lfilt_type = label.Label(terminalio.FONT, text="-", x=2,y=32)
-        lfilt_f  = label.Label(terminalio.FONT, text="-", x=75,y=32)
+        lfilt_type = label.Label(terminalio.FONT, text="-", x=2, y=32)
+        lfilt_f  = label.Label(terminalio.FONT, text="-", x=75, y=32)
 
-        lfilt_q  = label.Label(terminalio.FONT, text="-", x=2,y=45)
-        lfilt_env= label.Label(terminalio.FONT, text="-", x=70,y=45)
+        lfilt_q  = label.Label(terminalio.FONT, text="-", x=2, y=45)
+        lfilt_env= label.Label(terminalio.FONT, text="-", x=70, y=45)
+
+        loct = label.Label(terminalio.FONT, text="-", x=2, y=58)
+        lvol = label.Label(terminalio.FONT, text="-", x=70, y=58)
 
         self.disp_line1 = displayio.Group()
         for l in (lwave_sel, lwave_mix):
@@ -60,17 +64,23 @@ class WavesynthDisplay:
             self.disp_line4.append(l)
         disp_group.append(self.disp_line4)
 
+        self.disp_line5 = displayio.Group()
+        for l in (loct, lvol):
+            self.disp_line5.append(l)
+        disp_group.append(self.disp_line5)
+
         # selection lines
         pal = displayio.Palette(1)
         pal[0] = 0xffffff
-        selectF = vectorio.Rectangle(pixel_shader=pal, width=128, height=1, x=0, y=6 + 8)
-        selectW = vectorio.Rectangle(pixel_shader=pal, width=128, height=1, x=0, y=19 + 8)
-        selectG = vectorio.Rectangle(pixel_shader=pal, width=128, height=1, x=0, y=32 + 8)
-        selectH = vectorio.Rectangle(pixel_shader=pal, width=128, height=1, x=0, y=45 + 8)
+        selectF = vectorio.Rectangle(pixel_shader=pal, width=128, height=1, x=0, y=6 + 6)
+        selectW = vectorio.Rectangle(pixel_shader=pal, width=128, height=1, x=0, y=19 + 6)
+        selectG = vectorio.Rectangle(pixel_shader=pal, width=128, height=1, x=0, y=32 + 6)
+        selectH = vectorio.Rectangle(pixel_shader=pal, width=128, height=1, x=0, y=45 + 6)
+        selectO = vectorio.Rectangle(pixel_shader=pal, width=128, height=1, x=0, y=58 + 6)
 
         self.disp_selects = displayio.Group()
-        for s in (selectF,selectW,selectG, selectH):
-            s.hidden=True
+        for s in (selectF, selectW, selectG, selectH, selectO):
+            s.hidden = True
             self.disp_selects.append(s)
         disp_group.append(self.disp_selects)
 
@@ -80,6 +90,7 @@ class WavesynthDisplay:
         self.display_update_line2()
         self.display_update_line3()
         self.display_update_line4()
+        self.display_update_line5()
 
     def disp_select(self):
         for s in self.disp_selects:
@@ -120,10 +131,18 @@ class WavesynthDisplay:
         if self.disp_line4[0].text != filt_q:
             self.disp_line4[0].text = filt_q
         if self.disp_line4[1].text != filt_env:
-            #print("!")
             self.disp_line4[1].text = filt_env
 
-    # utility methods for dealing with these "wave_selects" I've gotten myself into
+    def display_update_line5(self):
+        octave = "oct:%+1d" % self.patch.octave
+        volume = "vol:%1.1f" % self.patch.volume
+
+        if self.disp_line5[0].text != octave:
+            self.disp_line5[0].text = octave
+        if self.disp_line5[1].text != volume:
+            self.disp_line5[1].text = volume
+
+    # utility methods for dealing with these "wave_selects" that I've gotten myself into
 
     def update_wave_selects(self):   # fixme: why isn't this a Patch class method?
         wave_selects = [

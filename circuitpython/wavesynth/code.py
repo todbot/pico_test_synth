@@ -23,8 +23,8 @@ import pico_test_synth.winterbloom_smolmidi as smolmidi
 
 from wavesynth_display import WavesynthDisplay
 
-# import microcontroller
-# microcontroller.cpu.frequency = 250_000_000
+import microcontroller
+microcontroller.cpu.frequency = 250_000_000
 
 time.sleep(2)  # let USB settle down
 
@@ -110,35 +110,42 @@ async def midi_handler():
 async def input_handler():
 
     # fixme: put these in hardware.py? no I think they are part of this "app"
+    # also this 'knob_saves' business is kludgey and gross
     knob_mode = 0  # 0=frequency, 1=wavemix, 2=, 3=
-    key_held = False
-    key_with_touch = False
-    knob_saves = [(0, 0) for _ in range(4)]  # list of knob state pairs
-    param_saves = [(0, 0) for _ in range(4)]  # list of param pairs for knobs
+    button_held = False
+    button_with_touch = False
+    max_lines = wavedisp.max_lines
+    knob_saves = [(0, 0) for _ in range(max_lines)]  # list of knob state pairs
+    param_saves = [(0, 0) for _ in range(max_lines)]  # list of param pairs for knobs
     knobA_pickup, knobB_pickup = False, False
-    
-    for i in range(len(knob_saves)):
-        knob_saves[i] = hw.read_pots()
-    knobA, knobB = hw.read_pots()
+    # index is touch keynumber, value is midi note
+    notes_pressed = [None] * len(hw.touches)
 
     def reload_patch(wave_select):
         print("reload patch!", wave_select)
-        # the below seems like the wrong way to do this, needlessly complex
+        # the below is the wrong way to do this, needlessly complex
         inst.patch.set_by_wave_select(wave_select)
         inst.reload_patch()
         param_saves[0] = wavedisp.wave_select_pos(), inst.patch.wave_mix
         param_saves[1] = inst.patch.detune, inst.patch.wave_mix_lfo_amount
         param_saves[2] = inst.patch.filt_type, inst.patch.filt_f
         param_saves[3] = inst.patch.filt_q, inst.patch.filt_env_params.attack_time
+        param_saves[4] = inst.patch.octave, inst.patch.volume
 
+    knobA, knobB = hw.read_pots()
+    for i in range(max_lines):
+        knob_saves[i] = knobA, knobB
+
+    reload_patch(wavedisp.wave_selects[0])  # to set param_saves
+    
     while True:
         # KNOB input
         (knobA_new, knobB_new) = hw.read_pots()
-        
-        # # simple knob pickup logic: if the real knob is close enough to
+
+        # # simple knob pickup logic: if the real knob is close enough 
         if abs(knobA - knobA_new) < 1000:  # knobs range 0-65535
             knobA_pickup = True
-        if abs(knobB - knobB_new) <= 1000:
+        if abs(knobB - knobB_new) < 1000:
             knobB_pickup = True
 
         knobA = knobA_new if knobA_pickup else knobA
@@ -149,99 +156,116 @@ async def input_handler():
             for touch in touches:
 
                 if touch.pressed:
-                    if key_held:  # load a patch
+                    if button_held:  # load a patch
                         print("load patch", touch.key_number)
                         # disable this for now
                         #  inst.load_patch(patches[i])
                         #  hw.patch = patches[i]
                         wavedisp.display_update()
-                        key_with_touch = True
+                        button_with_touch = True
                     else:  # trigger a note
                         hw.set_led(0xff00ff)
                         midi_note = touch_midi_notes[touch.key_number]
+                        midi_note += (inst.patch.octave*12)
+                        notes_pressed[touch.key_number] = midi_note
                         inst.note_on(midi_note)
 
                 if touch.released:
-                    if key_with_touch:
-                        key_with_touch = False
+                    if button_with_touch:
+                        button_with_touch = False
                     else:
                         hw.set_led(0)
-                        midi_note = touch_midi_notes[touch.key_number]
+                        midi_note = notes_pressed[touch.key_number]
                         inst.note_off(midi_note)
 
-        # KEY input
-        if key := hw.check_key():
-            if key.pressed:
-                key_held = True
-            if key.released:
-                key_held = False
-                if not key_with_touch:  # key tap == change what knobs do
+        # BUTTON input
+        if button := hw.check_button():
+            if button.pressed:
+                button_held = True
+            if button.released:
+                button_held = False
+                if not button_with_touch:  
                     # turn off pickup mode since we change what knobs do
                     knobA_pickup, knobB_pickup = False, False
                     knob_saves[knob_mode] = knobA, knobB  # save knob positions
-                    knob_mode = (knob_mode + 1) % 4  # FIXME: make a max_knob_mode
-                    knobA, knobB = knob_saves[knob_mode] # retrive saved knob positions
+                    knob_mode = (knob_mode + 1) % 5  # FIXME: make max_knob_mode
+                    knobA, knobB = knob_saves[knob_mode]  # retrieve saved pos
                     print("knob mode:",knob_mode, knobA, knobB)
                     wavedisp.selected_info = knob_mode  # FIXME
 
         # Handle parameter changes depending on knob mode
+        # this is such a mess
         if knob_mode == 0:  # wave selection & wave_mix
-
             wave_select_pos, wave_mix = param_saves[knob_mode]
 
-            wave_select_pos = map_range(knobA, 0, 65535, 0, len(wavedisp.wave_selects)-1)
-            wave_mix = map_range(knobB, 0,  65535, 0, 1)
+            if knobA_pickup: 
+                wave_select_pos = map_range(knobA, 0, 65535, 0, len(wavedisp.wave_selects)-1)
+            if knobB_pickup:
+                wave_mix = map_range(knobB, 0,  65535, 0, 1)
 
             param_saves[knob_mode] = wave_select_pos, wave_mix
-
             wave_select = wavedisp.wave_selects[int(wave_select_pos)]
-
             if inst.patch.wave_select() != wave_select:
                 reload_patch(wave_select)
-
             inst.patch.wave_mix = wave_mix
 
         elif knob_mode == 1:  # osc detune & wave_mix lfo
-
             detune, wave_lfo = param_saves[knob_mode]
 
             # 300-65300 because RP2040 has bad ADC
-            detune = map_range(knobA, 300, 65300, 1, 1.1)
-            wave_lfo = map_range(knobB, 0, 65535, 0, 1)
+            if knobA_pickup:
+                detune = map_range(knobA, 300, 65300, 1, 1.1)
+            if knobB_pickup:
+                wave_lfo = map_range(knobB, 0, 65535, 0, 1)
 
             param_saves[knob_mode] = detune, wave_lfo
-
             inst.patch.wave_mix_lfo_amount = wave_lfo
             inst.patch.detune = detune
 
         elif knob_mode == 2:  # filter type and filter freq
             filt_type, filt_f = param_saves[knob_mode]
 
-            filt_type = int(map_range(knobA, 0, 65535, 0, 3))
-            filt_f = map_range(knobB, 300, 65300, 100, 8000)
+            if knobA_pickup:
+                filt_type = int(map_range(knobA, 0, 65535, 0, 3))
+            if knobB_pickup:
+                filt_f = map_range(knobB, 300, 65300, 100, 8000)
 
             param_saves[knob_mode] = filt_type, filt_f
-
             inst.patch.filt_type = filt_type
             inst.patch.filt_f = filt_f
 
         elif knob_mode == 3:
             filt_q, filt_env = param_saves[knob_mode]
 
-            filt_q = map_range(knobA, 0, 65535, 0.5, 2.5)
-            filt_env = map_range(knobB, 300, 65300, 1, 0.01)
+            if knobA_pickup:
+                filt_q = map_range(knobA, 0, 65535, 0.5, 2.5)
+            if knobB_pickup:
+                filt_env = map_range(knobB, 300, 65300, 1, 0.01)
 
             param_saves[knob_mode] = filt_q, filt_env
-
             inst.patch.filt_q = filt_q
             inst.patch.filt_env_params.attack_time = filt_env
 
+        elif knob_mode == 4:
+            octave, volume = param_saves[knob_mode]
+
+            if knobA_pickup:
+                octave = int(map_range(knobA, 0, 65535, -3, 3))
+            if knobB_pickup:
+                volume = map_range(knobB, 300, 65300, 0.1, 1)
+
+            param_saves[knob_mode] = octave, volume
+            inst.patch.octave = octave
+            inst.patch.volume = volume
+            hw.set_volume(volume)
         else:
             pass
 
+        
         await asyncio.sleep(0.005)
 
-
+    
+        
 print("--- pico_test_synth wavesynth ready ---")
 
 async def main():

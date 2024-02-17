@@ -234,6 +234,8 @@ class Patch:
         self.filt_q = filt_q
         self.filt_env_params = filt_env_params or EnvParams()
         self.amp_env_params = amp_env_params or EnvParams()
+        self.octave = 0
+        self.volume = 1
 
     def wave_select(self):
         """Construct a 'wave_select' string from patch parts"""
