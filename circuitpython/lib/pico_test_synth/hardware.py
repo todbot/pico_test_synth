@@ -8,7 +8,7 @@
 # UI fixme:
 # knob "pickup" vs knob "catchup"  (maybe done in app instead)
 
-import board, pwmio, busio
+import board, digitalio, pwmio, busio
 import analogio, keypad
 import touchio
 from adafruit_debouncer import Debouncer
@@ -16,6 +16,7 @@ import audiobusio, audiomixer
 import synthio
 import displayio
 import adafruit_displayio_ssd1306
+
 
 SAMPLE_RATE = 25600   # lets try powers of two
 MIXER_BUFFER_SIZE = 4096
@@ -27,6 +28,7 @@ sw_pin        = board.GP28
 knobB_pin     = board.GP27
 knobA_pin     = board.GP26
 led_pin       = board.GP25  # regular LED, not neopixel
+pico_pwr_pin  = board.GP23  # HIGH = improved ripple (lower noise) but less efficient
 i2s_data_pin  = board.GP22
 i2s_lclk_pin  = board.GP21
 i2s_bclk_pin  = board.GP20
@@ -56,6 +58,10 @@ class Hardware():
             touchin.threshold = int(touchin.threshold * 1.1)  # noise protec
             self.touchins.append(touchin)
             self.touches.append(Debouncer(touchin))
+
+        # make power supply less noisy on real Picos
+        self.pwr_mode = digitalio.DigitalInOut(pico_pwr_pin)
+        self.pwr_mode.switch_to_output(value=True)
 
         self.midi_uart = busio.UART(rx=uart_rx_pin, tx=uart_tx_pin,
                                     baudrate=31250, timeout=0.001)
@@ -90,22 +96,20 @@ class Hardware():
         self.led.duty_cycle = (v & 255) * 255  # only use B of RGB, if RGB
 
     def read_pots(self):
-        """Read the knobs, filter out their noise """
-        filt = 0.5
-
-        # avg_cnt = 5
-        # knobA_vals = [self.knobA] * avg_cnt
-        # knobB_vals = [self.knobB] * avg_cnt
-        # for i in range(avg_cnt):
-        #     knobA_vals[i] = self._knobA.value
-        #     knobB_vals[i] = self._knobB.value
-
-        # self.knobA = filt * self.knobA + (1-filt)*(sum(knobA_vals)/avg_cnt)  # filter noise
-        # self.knobB = filt * self.knobB + (1-filt)*(sum(knobB_vals)/avg_cnt)  # filter noise
-
-        self.knobA = filt * self.knobA + (1-filt)*(self._knobA.value)  # filter noise
-        self.knobB = filt * self.knobB + (1-filt)*(self._knobB.value)  # filter noise
-        return (int(self.knobA), int(self.knobB))
+        """
+        Read the knobs, filter out their noise,
+        # Return pair of 0-255 values
+        """
+        valA, valB =  self._knobA.value, self._knobB.value
+        self.knobA = valA if abs(valA-self.knobA) > 3 else self.knobA
+        self.knobB = valB if abs(valB-self.knobB) > 3 else self.knobB
+        return self.knobA//255, self.knobB//255
+        #knobB = knobBnew if abs(knobBnew-knobB) > 3 else knobB
+        
+        #filt = 0.5  # filter amount, higher to filter more, more lag
+        #self.knobA = filt * self.knobA + (1-filt)*(self._knobA.value)  # filter noise
+        #self.knobB = filt * self.knobB + (1-filt)*(self._knobB.value)  # filter noise
+        #return (self.knobA//255, self.knobB/255)  # admit knobs are only 8-bit
 
     def check_touch(self):
         """Check the four touch inputs, return keypad-like Events"""
