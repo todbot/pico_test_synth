@@ -3,7 +3,7 @@
 A simple [Raspberry Pi Pico RP2040](https://www.raspberrypi.com/documentation/microcontrollers/raspberry-pi-pico.html)-based
 synth to experiment with [`synthio`](https://github.com/todbot/circuitpython-synthio-tricks).
 
-<img src="./docs/pico_test_synth1.jpg" width=500>
+<img src="./docs/pico_test_synth_case1_web.jpg" width=500>
 <img src="./docs/pico_test_synth2.jpg" width=500>
 
 video demo: https://www.youtube.com/watch?v=9U2Dn7ckdbs
@@ -36,6 +36,12 @@ More code specific for this board coming!
 #### See also:
 - https://github.com/todbot/circuitpython-synthio-tricks
   - Contains [many other synthio examples](https://github.com/todbot/circuitpython-synthio-tricks/tree/main/examples) that can work with this synth with minimal changes
+
+
+### Enclosure
+
+As seen in the top photo, there's a very simple [3d-printable enclosure available on Printables](https://www.printables.com/model/784414-case-for-pico_test_synth-circuitpython-synthesizer). You can snap the PCB in to quickly get started,
+or use M2.5 screws and nuts to secure the PCB more permanently.
 
 
 
