@@ -37,6 +37,10 @@ class SynthUI(displayio.Group):
         self.scalerB = ParamScaler(self.params[1].get_by_gauge_val(), knobBval)
         self.pairnum = 0
         self.select_pair(0)
+        
+        self.lastA = knobAval
+        self.lastB = knobBval
+        self.knobMin = 5
 
     def select_pair(self,p):
         self.cluster.select_line(self.pairnum, False)  # deselect old
@@ -47,10 +51,16 @@ class SynthUI(displayio.Group):
         self.labelA.text = self.params[i+0].name
         self.labelB.text = self.params[i+1].name
         self.labelB.x = 128 - self.labelB.width
+        self.textA.text = self.params[i+0].get_text()
+        self.textB.text = self.params[i+1].get_text()
+        self.textB.x = 128 - self.textB.width  # sigh
         self.scalerA.reset(self.params[i+0].get_by_gauge_val())
         self.scalerB.reset(self.params[i+1].get_by_gauge_val())
 
     def setA(self,v):  # v = 0-127
+        if abs(v-self.lastA) < self.knobMin:
+            return
+        self.lastA = v
         i = self.pairnum * 2
         v = int(self.scalerA.update(v))
         self.cluster.set_gauge_val(i,v)
@@ -61,6 +71,9 @@ class SynthUI(displayio.Group):
         # fixme: need formatting info
 
     def setB(self, v): # v = 0-127
+        if abs(v-self.lastB) < self.knobMin:
+            return
+        self.lastB = v
         i = self.pairnum * 2 + 1
         v = self.scalerB.update(v)
         self.params[i].set_by_gauge_val(v)

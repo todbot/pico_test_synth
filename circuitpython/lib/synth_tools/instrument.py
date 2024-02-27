@@ -76,10 +76,10 @@ class WavePolyTwoOsc(Instrument):
         # standard two-osc oscillator patch
         if patch.wave_type == WaveType.OSC:
             self.waveform = Waves.make_waveform('silence')  # our working buffer, overwritten w/ wavemix
-            self.waveformA = Waves.make_waveform( patch.wave )
+            self.waveformA = Waves.make_waveform( patch.wave, volume=16000 )
             self.waveformB = None
             if patch.waveB:
-                self.waveformB = Waves.make_waveform( patch.waveB )
+                self.waveformB = Waves.make_waveform( patch.waveB, volume=16000 )
             else:
                 self.waveform = self.waveformA
 
