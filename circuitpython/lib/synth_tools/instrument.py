@@ -9,12 +9,9 @@ try:
 except:
     print("synthio_instrment: no WAV import available")
 
-# mix between values a and b, works with numpy arrays too,  t ranges 0-1
-def lerp(a, b, t):  return (1-t)*a + t*b
-
 
 from synth_tools.patch import Patch, WaveType
-from synth_tools.waves import Waves
+from synth_tools.waves import Waves, Wavetable, lerp
 
 # a very simple instrument
 class Instrument():
@@ -88,12 +85,48 @@ class WavePolyTwoOsc(Instrument):
             self.wavetable = Wavetable(patch.wave_dir+"/"+patch.wave+".WAV")
             self.waveform = self.wavetable.waveform
 
-        self.filt_env_wave = Waves.lfo_triangle()
+        self.filt_env_wave = Waves.lfo_triangle()  # FIXME
 
     def reload_patch(self):
         self.note_off_all()
         self.synth.blocks.clear()  # clear out global wavetable LFOs (if any)
         self.load_patch(self.patch)
+
+    def _update_filter(self, osc1, osc2, filt_env):
+        filt_q = self.patch.filt_q
+        filt_mod = 0
+        filt_f = 0
+        filt = None
+
+        # prevent filter instability around note frequency
+        # must do this for each voice
+        #if self.patch.filt_f / osc1.frequency < 1.2:  filt_q = filt_q / 2
+        #filt_f = max(self.patch.filt_f * filt_env.value, osc1.frequency*0.75) # filter unstable <oscfreq?
+        #filt_f = max(self.patch.filt_f * filt_env.value, 0) # filter unstable <100?
+        
+        if self.patch.filt_type == "LP":
+            #if self.patch.filt_env_params.attack_time > 0:
+            #filt_mod = max(0, 0.5 * 8000 * (filt_env.value/2))  # 8k/2 = max freq, 0.5 = filtermod amt
+            filt_f = self.patch.filt_f + filt_mod
+            filt = self.synth.low_pass_filter( filt_f,filt_q )
+            
+        elif self.patch.filt_type == "HP":
+            #filt_mod = max(0, 0.5 * 8000 * (filt_env.value/2))  # 8k/2 = max freq, 0.5 = filtermod amt
+            filt_f = self.patch.filt_f + filt_mod
+            filt = self.synth.high_pass_filter( filt_f,filt_q )
+            
+        elif self.patch.filt_type == "BP":
+            #filt_mod = max(0, 0.5 * 8000 * (filt_env.value/2))  # 8k/2 = max freq, 0.5 = filtermod amt
+            filt_f = self.patch.filt_f + filt_mod
+            filt = self.synth.band_pass_filter( filt_f,filt_q )
+        else:
+            print("unknown filt_type:", self.patch.filt_type)
+            
+        #print("%s: %.1f %.1f %.1f %.1f"%(self.patch.filt_type,osc1.frequency,filt_f,self.patch.filt_f,filt_q))
+        osc1.filter = filt
+        if self.patch.detune:
+            osc2.filter = filt
+        
 
     def update(self):
         for (osc1,osc2,filt_env,amp_env) in self.voices.values():
@@ -108,45 +141,15 @@ class WavePolyTwoOsc(Instrument):
             # else simple osc wave mixing
             else:
                 if self.waveformB:
-                    #wave_mix = self.patch.wave_mix + self.wave_lfo.a.rate * self.patch.wave_mix_lfo_amount * 2  # FIXME: does not work yet
+                    # FIXME: does not work yet
+                    #wave_mix = self.patch.wave_mix + self.wave_lfo.a.rate * self.patch.wave_mix_lfo_amount * 2
                     wave_mix = self.patch.wave_mix
                     osc1.waveform[:] = lerp(self.waveformA, self.waveformB, wave_mix) #self.patch.wave_mix)
                     if self.patch.detune:
                         osc2.waveform[:] = lerp(self.waveformA, self.waveformB, wave_mix) #self.patch.wave_mix)
 
-            filt_q = self.patch.filt_q
-            filt_mod = 0
-            filt_f = 0
-            filt = None
-
-            # prevent filter instability around note frequency
-            # must do this for each voice
-            #if self.patch.filt_f / osc1.frequency < 1.2:  filt_q = filt_q / 2
-            #filt_f = max(self.patch.filt_f * filt_env.value, osc1.frequency*0.75) # filter unstable <oscfreq?
-            #filt_f = max(self.patch.filt_f * filt_env.value, 0) # filter unstable <100?
-
-            if self.patch.filt_type == "LP":
-                if self.patch.filt_env_params.attack_time > 0:
-                    filt_mod = max(0, 0.5 * 8000 * (filt_env.value/2))  # 8k/2 = max freq, 0.5 = filtermod amt
-                    filt_f = self.patch.filt_f + filt_mod
-                    filt = self.synth.low_pass_filter( filt_f,filt_q )
-
-            elif self.patch.filt_type == "HP":
-                    filt_mod = max(0, 0.5 * 8000 * (filt_env.value/2))  # 8k/2 = max freq, 0.5 = filtermod amt
-                    filt_f = self.patch.filt_f + filt_mod
-                    filt = self.synth.high_pass_filter( filt_f,filt_q )
-
-            elif self.patch.filt_type == "BP":
-                    filt_mod = max(0, 0.5 * 8000 * (filt_env.value/2))  # 8k/2 = max freq, 0.5 = filtermod amt
-                    filt_f = self.patch.filt_f + filt_mod
-                    filt = self.synth.band_pass_filter( filt_f,filt_q )
-            else:
-                print("unknown filt_type:", self.patch.filt_type)
-
-            #print("%s: %.1f %.1f %.1f %.1f"%(self.patch.filt_type,osc1.frequency,filt_f,self.patch.filt_f,filt_q))
-            osc1.filter = filt
-            if self.patch.detune:
-                osc2.filter = filt
+            self._update_filter(osc1,osc2,filt_env)
+            
 
     def note_on(self, midi_note, midi_vel=127):
         amp_env = self.patch.amp_env_params.make_env()
@@ -160,7 +163,9 @@ class WavePolyTwoOsc(Instrument):
         f = synthio.midi_to_hz(midi_note)
         osc1 = synthio.Note( frequency=f, waveform=self.waveform, envelope=amp_env )
         osc2 = synthio.Note( frequency=f * self.patch.detune, waveform=self.waveform, envelope=amp_env )
-
+        
+        self._update_filter(osc1, osc2, filt_env)
+        
         self.voices[midi_note] = (osc1, osc2, filt_env, amp_env)
         self.synth.press( (osc1,osc2) )
         self.synth.blocks.append(filt_env) # not tracked automaticallly by synthio

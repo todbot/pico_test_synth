@@ -12,6 +12,8 @@ import synth_tools.winterbloom_smolmidi as smolmidi
 
 from synthui import SynthUI
 
+import microcontroller
+microcontroller.cpu.frequency = 250_000_000
 time.sleep(2)
 
 touch_midi_notes = list(range(45, 45+16))  # notes touch keyboard sends FIXME
@@ -27,9 +29,13 @@ midi_uart_in = smolmidi.MidiIn(hw.midi_uart)
 patch1 = Patch('oneuno')
 patch2 = Patch('twotoo')
 
-patch1.filt_env_params.attack_time = 0.1
 patch1.amp_env_params.attack_time = 0.01
-patch1.filt_f = 1234
+patch1.filt_env_params.attack_time = 1.1
+patch1.filt_f = 2345
+patch1.filt_q = 1.7
+patch1.waveB = 'SQU'
+patch1.wave_mix_lfo_amount = 0
+patch1.detune = 1.01
 
 patch2.filt_type = "HP"
 patch2.wave = 'square'
@@ -43,9 +49,11 @@ inst = WavePolyTwoOsc(hw.synth, patch)
 wave_selects = patch.generate_wave_selects()
 filter_types = ("LP","BP","HP")
 
-def update_wave_select(x):
-    print("update_wave_select:",x)
-    pass
+def update_wave_select(wave_select_idx):
+    wave_select = wave_selects[wave_select_idx]
+    print("update_wave_select:",wave_select_idx, wave_select)
+    inst.patch.set_by_wave_select(wave_select)
+    inst.reload_patch()
 
     
 params = (
@@ -56,7 +64,6 @@ params = (
     
     ParamRange("FilterRes", "filter resonance", 0.7, "%1.2f", 0.1, 2.5,
                setter=lambda x: setattr(patch,"filt_q",x)),
-    
     ParamChoice("WaveSel", "wave select", 0, wave_selects,
                 setter=lambda x: update_wave_select(x)),  # FIXME: requires reload patch
     
@@ -70,9 +77,10 @@ params = (
     ParamRange("AmpRls", "release time", 0.3, "%1.2f", 0.3, 3.0,
                setter=lambda x: setattr(patch.amp_env_params,"release_time",x)),
     
-    ParamRange("FiltAtk", "filter attack ", 0.1, "%1.2f", 0.1, 5.0,
+    ParamRange("FiltAtk", "filter attack ", 2.0, "%1.2f", 0.1, 5.0,
                setter=lambda x: setattr(patch.filt_env_params,"attack_time",x)),
-    ParamRange("FiltRls", "filter release", 0.3, "%1.2f", 0.0, 5.0),
+    ParamRange("FiltRls", "filter release", 0.3, "%1.2f", 0.0, 5.0,
+               setter=lambda x: setattr(patch.filt_env_params,"release_time",x)),
 )
 
 # from collections import OrderedDict
@@ -82,7 +90,6 @@ params = (
 #     ("wmix", ParamRange("wmix", "wave mix", 1.2, "%.2f", 0.0, 0.99)),
 #     ("wlfo", ParamRange("wlfo", "wave lfo", 0.3, "%2.1f", 0.0, 10)),
 # ))
-
 
 # params = [
 #     ParamRange(param_group[0], 0,
@@ -146,19 +153,19 @@ def handle_touch():
                     #wavedisp.display_update()
                     #button_with_touch = True
                 else:  # trigger a note
-                    hw.set_led(0xff00ff)
                     midi_note = touch_midi_notes[touch.key_number]
                     midi_note += (inst.patch.octave*12)
                     notes_pressed[touch.key_number] = midi_note
                     inst.note_on(midi_note)
+                    hw.set_led(0xff00ff)
 
             if touch.released:
                 if button_with_touch:
                     button_with_touch = False
                 else:
-                    hw.set_led(0)
                     midi_note = notes_pressed[touch.key_number]
                     inst.note_off(midi_note)
+                    hw.set_led(0)
 
 
 knobA, knobB = hw.read_pots()  # returns 0-255 values
@@ -170,22 +177,22 @@ while True:
     hw.display.refresh()
     
     inst.update()
+    
     handle_midi()
     handle_touch()
     
-    knobA, knobB = hw.read_pots()
     if button := hw.check_button():
         if button.pressed:
             p = (p+1) % (synthui.num_params//2)
             synthui.select_pair(p)
             print("select_pair:", p)
             
+    knobA, knobB = hw.read_pots()
     synthui.setA( knobA // 2 )
     synthui.setB( knobB // 2 )
-    #time.sleep(0.05)
     
     if time.monotonic() - last_time > 0.5:
-        last_time = time.monotonic()
-        print("patch:", inst.patch)
+       last_time = time.monotonic()
+       print("patch:", inst.patch)
 
 

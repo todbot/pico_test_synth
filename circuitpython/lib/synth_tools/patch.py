@@ -98,7 +98,9 @@ class Patch:
         self.waveB = waveB[0] if waveB and len(waveB) else None  # can this be shorter?
 
     def __repr__(self):
-        return "Patch('%s','%s','%.2f','%d')" % (self.name,self.wave_select(), self.wave_mix, self.filt_f)
+        return "Patch('%s','%s','%.2f','%d %1.1f')" % (
+            self.name, self.wave_select(), self.wave_mix,
+            self.filt_f, self.filt_q)
 
     def generate_wave_selects(self):   # fixme: why isn't this a Patch class method?
         wave_selects = [

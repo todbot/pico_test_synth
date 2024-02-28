@@ -18,7 +18,8 @@ import displayio
 import adafruit_displayio_ssd1306
 
 
-SAMPLE_RATE = 25600   # lets try powers of two
+#SAMPLE_RATE = 25600   # lets try powers of two
+SAMPLE_RATE = 22050
 MIXER_BUFFER_SIZE = 4096
 CHANNEL_COUNT = 1
 DW,DH = 128, 64  # display width/height
@@ -71,7 +72,8 @@ class Hardware():
         display_bus = displayio.I2CDisplay(i2c, device_address=0x3c)
         self.display = adafruit_displayio_ssd1306.SSD1306(display_bus,
                                                           width=DW, height=DH,
-                                                          rotation=180)
+                                                          rotation=180,
+                                                          auto_refresh = False)
 
         # now do audio setup so we have minimal audible glitches
         self.audio = audiobusio.I2SOut(bit_clock=i2s_bclk_pin,

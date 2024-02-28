@@ -9,6 +9,9 @@ try:
 except:
     print("synthio_waves: no WAV import available")
 
+# mix between values a and b, works with numpy arrays too,  t ranges 0-1
+def lerp(a, b, t):  return (1-t)*a + t*b
+
 
 class Waves:
     """
