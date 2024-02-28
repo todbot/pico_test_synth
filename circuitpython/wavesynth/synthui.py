@@ -40,7 +40,7 @@ class SynthUI(displayio.Group):
         
         self.lastA = knobAval
         self.lastB = knobBval
-        self.knobMin = 2
+        self.knobMin = 1
 
     def select_pair(self,p):
         self.cluster.select_line(self.pairnum, False)  # deselect old

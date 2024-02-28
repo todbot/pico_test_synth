@@ -59,18 +59,19 @@ def update_wave_select(wave_select_idx):
 params = (
     ParamRange("FiltFreq", "filter frequency", 1234, "%4d", 10, 8000,
                setter=lambda x: setattr(patch,"filt_f",x)),
-    ParamChoice("FiltType", "filter type", 0, filter_types,
-                setter=lambda x: setattr(patch,"filt_type",filter_types[x])),
-    
     ParamRange("FilterRes", "filter resonance", 0.7, "%1.2f", 0.1, 2.5,
                setter=lambda x: setattr(patch,"filt_q",x)),
+    
+    ParamRange("WaveMix", "wave mix", 0.2, "%.2f", 0.0, 0.99,
+               setter=lambda x: setattr(patch,"wave_mix",x)),
     ParamChoice("WaveSel", "wave select", 0, wave_selects,
                 setter=lambda x: update_wave_select(x)),  # FIXME: requires reload patch
     
-    ParamRange("WaveMix", "wave mix", 0.2, "%.2f", 0.0, 0.99,
-               setter=lambda x: setattr(patch,"wmix",x)),
     ParamRange("WaveLFO", "wave lfo", 0.3, "%2.1f", 0.0, 10,
                setter=lambda x: setattr(patch,"wave_lfo",x)),
+    ParamChoice("FiltType", "filter type", 0, filter_types,
+                setter=lambda x: setattr(patch,"filt_type",filter_types[x])),
+    
     
     ParamRange("AmpAtk", "attack time", 0.1, "%1.2f", 0.1, 3.0,
                setter=lambda x: setattr(patch.amp_env_params,"attack_time",x)),

@@ -18,8 +18,8 @@ import displayio
 import adafruit_displayio_ssd1306
 
 
-#SAMPLE_RATE = 25600   # lets try powers of two
-SAMPLE_RATE = 22050
+SAMPLE_RATE = 25600   # lets try powers of two
+#SAMPLE_RATE = 22050
 MIXER_BUFFER_SIZE = 4096
 CHANNEL_COUNT = 1
 DW,DH = 128, 64  # display width/height
