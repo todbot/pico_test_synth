@@ -3,7 +3,7 @@ import vectorio
 
 class GaugeCluster():  # (dispalyio.Group) ?
     def __init__(self, num_vals, x=2, y=4, width=5, height=40, xstride=3):
-        self.gauge_vals = [0] * num_vals  # 0-127 is val range
+        self.gauge_vals = [0] * num_vals  # 0-255 is val range
         self.x = x
         self.y = y
         self.w = width
@@ -43,8 +43,8 @@ class GaugeCluster():  # (dispalyio.Group) ?
         self.select_lines = select_lines
 
     def set_gauge_val(self, i, v):
-        self.gauge_vals[i] = v  # 0-127
-        self.gauges[1+(i*2)].height = self.h - 2 - ((v * (self.h-2)) // 127)
+        self.gauge_vals[i] = v  # 0-255
+        self.gauges[1+(i*2)].height = self.h - 2 - ((v * (self.h-2)) // 255)
 
     def get_gauge_val(self,i):
         return self.gauge_vals[i]

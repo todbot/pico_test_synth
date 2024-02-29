@@ -1,3 +1,5 @@
+
+
 class Param:
     def __init__(self, name, fullname, val, ):
         self.name = name
@@ -16,12 +18,12 @@ class ParamRange:
     def get_text(self):
         return self.fmt % self.val  # text representation
     
-    def set_by_gauge_val(self, gv):  # gv ranges 0-127
-        self.val = (gv * (self.valrange) / 127) + self.minval
+    def set_by_gauge_val(self, gv):  # gv ranges 0-255
+        self.val = (gv * (self.valrange) / 255) + self.minval
         if self.setter: self.setter(self.val)
         
     def get_by_gauge_val(self):
-        return (self.val - self.minval)/(self.valrange) * 127
+        return (self.val - self.minval)/(self.valrange) * 255
 
 class ParamChoice:
     def __init__(self, name, fullname, val, choices, setter=None):
@@ -33,10 +35,10 @@ class ParamChoice:
     def get_text(self):
         return self.choices[self.val]  # text representation
     
-    def set_by_gauge_val(self, gv):  # gv ranges 0-127
-        self.val = int(gv * (self.num_choices-1) / 127 )
+    def set_by_gauge_val(self, gv):  # gv ranges 0-255
+        self.val = int(gv * (self.num_choices-1) / 255 )
         if self.setter: self.setter(self.val)
         
     def get_by_gauge_val(self):
-        return int(self.val * 127 / (self.num_choices-1))  # FIXME: check this
+        return int(self.val * 255 / (self.num_choices-1))  # FIXME: check this
     

@@ -1,7 +1,7 @@
 from micropython import const
 
-knob_min, knob_max = const(0), const(127)  # midi cc
-val_min, val_max = const(0), const(127)  # or whatever
+knob_min, knob_max = const(0), const(255) 
+val_min, val_max = const(0), const(255) 
 
 class ParamScaler:
     def __init__(self, val, knob_pos):

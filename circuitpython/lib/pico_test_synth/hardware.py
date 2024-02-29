@@ -42,6 +42,8 @@ touch_pins = (board.GP0, board.GP1, board.GP2, board.GP3,
               board.GP8, board.GP9, board.GP10, board.GP11,
               board.GP12, board.GP13, board.GP14, board.GP15)
 
+knob_filt = 0.75   # filter amount, higher to filter more, more lag
+
 class Hardware():
     def __init__(self, sample_rate=SAMPLE_RATE, buffer_size=MIXER_BUFFER_SIZE):
 
@@ -103,15 +105,13 @@ class Hardware():
         # Return pair of 0-255 values
         """
         valA, valB =  self._knobA.value, self._knobB.value
-        self.knobA = valA if abs(valA-self.knobA) > 3 else self.knobA
-        self.knobB = valB if abs(valB-self.knobB) > 3 else self.knobB
-        return self.knobA//255, self.knobB//255
-        #knobB = knobBnew if abs(knobBnew-knobB) > 3 else knobB
+        #self.knobA = valA if abs(valA-self.knobA) > 3 else self.knobA
+        #self.knobB = valB if abs(valB-self.knobB) > 3 else self.knobB
         
-        #filt = 0.5  # filter amount, higher to filter more, more lag
-        #self.knobA = filt * self.knobA + (1-filt)*(self._knobA.value)  # filter noise
-        #self.knobB = filt * self.knobB + (1-filt)*(self._knobB.value)  # filter noise
-        #return (self.knobA//255, self.knobB/255)  # admit knobs are only 8-bit
+        # filter noise
+        self.knobA = knob_filt * self.knobA + (1-knob_filt)*(self._knobA.value)
+        self.knobB = knob_filt * self.knobB + (1-knob_filt)*(self._knobB.value)
+        return (self.knobA//255, self.knobB/255)  # admit knobs are only 8-bit
 
     def check_touch(self):
         """Check the four touch inputs, return keypad-like Events"""

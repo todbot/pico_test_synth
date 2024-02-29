@@ -13,19 +13,19 @@ class SynthUI(displayio.Group):
         self.params = params
         self.num_params = len(params)
         
-        self.cluster = GaugeCluster(self.num_params, x=12, y=4, width=7, height=40, xstride=2.5)
+        self.cluster = GaugeCluster(self.num_params, x=2, y=4, width=7, height=20, xstride=2.5)
         self.append(self.cluster.gauges)
         self.append(self.cluster.select_lines)  # indicates which param set is editable
         fnt = terminalio.FONT
         cw = 0xFFFFFF
         
         # text fields of the currently editable parameters
-        self.textA = label.Label(fnt, text="tA", color=cw, x=1, y=60)
-        self.textB = label.Label(fnt, text="tB", color=cw, x=64, y=60)
+        self.textA = label.Label(fnt, text="tA", color=cw, x=1, y=40, scale=2)
+        self.textB = label.Label(fnt, text="tB", color=cw, x=64, y=40, scale=2)
         
         # labels above the currently ediable parameters
-        self.labelA = label.Label(fnt, text="labA", color=cw, x=1, y=50)
-        self.labelB = label.Label(fnt, text="labB", color=cw, x=104, y=50)
+        self.labelA = label.Label(fnt, text="labA", color=cw, x=1, y=58, scale=1)
+        self.labelB = label.Label(fnt, text="labB", color=cw, x=104, y=58, scale=1)
         
         for l in (self.textA, self.textB, self.labelA, self.labelB):
             self.append(l)
@@ -42,6 +42,15 @@ class SynthUI(displayio.Group):
         self.lastB = knobBval
         self.knobMin = 1
 
+    def _fix_textB_right_justified(self):
+        self.textB.scale=2
+        w = self.textB.width * 2  # scale=2 above
+        if w > 80:
+            self.textB.scale=1
+            self.textB.x = 128 - w//2
+        else:
+            self.textB.x = 128 - w
+        
     def select_pair(self,p):
         self.cluster.select_line(self.pairnum, False)  # deselect old
         self.pairnum = p
@@ -53,11 +62,12 @@ class SynthUI(displayio.Group):
         self.labelB.x = 128 - self.labelB.width
         self.textA.text = self.params[i+0].get_text()
         self.textB.text = self.params[i+1].get_text()
-        self.textB.x = 128 - self.textB.width  # sigh
+        # self.textB.x = 128 - (self.textB.width*2)  # sigh
+        self._fix_textB_right_justified()
         self.scalerA.reset(self.params[i+0].get_by_gauge_val())
         self.scalerB.reset(self.params[i+1].get_by_gauge_val())
 
-    def setA(self,v):  # v = 0-127
+    def setA(self,v):  # v = 0-255
         if abs(v-self.lastA) < self.knobMin:
             return
         self.lastA = v
@@ -70,7 +80,7 @@ class SynthUI(displayio.Group):
             self.textA.text = t
         # fixme: need formatting info
 
-    def setB(self, v): # v = 0-127
+    def setB(self, v): # v = 0-255
         if abs(v-self.lastB) < self.knobMin:
             return
         self.lastB = v
@@ -82,5 +92,6 @@ class SynthUI(displayio.Group):
         t = self.params[i].get_text()
         if t != self.textB.text:
             self.textB.text = t
-            self.textB.x = 128 - self.textB.width
+            self._fix_textB_right_justified()
+            #self.textB.x = 128 - (self.textB.width*2)
 

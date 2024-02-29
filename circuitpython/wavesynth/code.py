@@ -30,7 +30,9 @@ patch1 = Patch('oneuno')
 patch2 = Patch('twotoo')
 
 patch1.amp_env_params.attack_time = 0.01
+patch1.amp_env_params.release_time = 0.3
 patch1.filt_env_params.attack_time = 1.1
+patch1.filt_env_params.release_time = 0.8
 patch1.filt_f = 2345
 patch1.filt_q = 1.7
 patch1.waveB = 'SQU'
@@ -51,13 +53,17 @@ filter_types = ("LP","BP","HP")
 
 def update_wave_select(wave_select_idx):
     wave_select = wave_selects[wave_select_idx]
-    print("update_wave_select:",wave_select_idx, wave_select)
+    #print("update_wave_select:",wave_select_idx, wave_select)
     inst.patch.set_by_wave_select(wave_select)
     inst.reload_patch()
 
-    
+# def update_octave(x):
+#     global octave
+#     octave = x
+import math
+
 params = (
-    ParamRange("FiltFreq", "filter frequency", 1234, "%4d", 10, 8000,
+    ParamRange("FiltFreq", "filter frequency", 1234, "%4d", 60, 8000,
                setter=lambda x: setattr(patch,"filt_f",x)),
     ParamRange("FilterRes", "filter resonance", 0.7, "%1.2f", 0.1, 2.5,
                setter=lambda x: setattr(patch,"filt_q",x)),
@@ -67,53 +73,31 @@ params = (
     ParamChoice("WaveSel", "wave select", 0, wave_selects,
                 setter=lambda x: update_wave_select(x)),  # FIXME: requires reload patch
     
-    ParamRange("WaveLFO", "wave lfo", 0.3, "%2.1f", 0.0, 10,
-               setter=lambda x: setattr(patch,"wave_lfo",x)),
-    ParamChoice("FiltType", "filter type", 0, filter_types,
-                setter=lambda x: setattr(patch,"filt_type",filter_types[x])),
+    ParamRange("WavLFO", "wave lfo amount", 0.3, "%2.1f", 0.0, 10,
+               setter=lambda x: setattr(patch,"wave_mix_lfo_amount",x)),
     
+    ParamRange("WavRate", "wave lfo rate", 0.3, "%2.1f", 0.0, 5,
+               setter=lambda x: setattr(patch,"wave_mix_lfo_rate",x)),
     
-    ParamRange("AmpAtk", "attack time", 0.1, "%1.2f", 0.1, 3.0,
+    # ParamChoice("FiltType", "filter type", 0, filter_types,
+    #             setter=lambda x: setattr(patch,"filt_type",filter_types[x])),
+     
+    ParamRange("AmpAtk", "attack time", 0.1, "%1.2f", 0.01, 3.0,
                setter=lambda x: setattr(patch.amp_env_params,"attack_time",x)),
-    ParamRange("AmpRls", "release time", 0.3, "%1.2f", 0.3, 3.0,
+    ParamRange("AmpRls", "release time", 0.3, "%1.2f", 0.1, 3.0,
                setter=lambda x: setattr(patch.amp_env_params,"release_time",x)),
     
-    ParamRange("FiltAtk", "filter attack ", 2.0, "%1.2f", 0.1, 5.0,
+    ParamRange("FiltAtk", "filter attack ", 1.1, "%1.2f", 0.01, 5.0,
                setter=lambda x: setattr(patch.filt_env_params,"attack_time",x)),
-    ParamRange("FiltRls", "filter release", 0.3, "%1.2f", 0.0, 5.0,
+    ParamRange("FiltRls", "filter release", 0.8, "%1.2f", 0.1, 5.0,
                setter=lambda x: setattr(patch.filt_env_params,"release_time",x)),
+
+    ParamRange("Octave", "octave range", 0, "%d", -3, 2,
+               setter=lambda x: setattr(patch, "octave",int(x)) ),
+    ParamRange("Volume", "volume", 1.0, "%1.2f", 0.1, 1.0,
+               setter=lambda x: inst.set_volume(x)),
 )
 
-# from collections import OrderedDict
-# params_ordered = OrderedDict((
-#     ("freq", ParamRange("freq", "filter frequency", 1234, "%4d", 100, 8000)),
-#     ("wsel", ParamChoice("wsel", "wave select", 0, wave_selects)),
-#     ("wmix", ParamRange("wmix", "wave mix", 1.2, "%.2f", 0.0, 0.99)),
-#     ("wlfo", ParamRange("wlfo", "wave lfo", 0.3, "%2.1f", 0.0, 10)),
-# ))
-
-# params = [
-#     ParamRange(param_group[0], 0,
-#                getter=lambda: patch.filt_f,
-#                setter=lambda x: setattr(patch,"filt_f",x),
-#                minval=100, maxval=8000,
-#                fmt="%4d"),
-#     ParamRange(param_group[1], 0,
-#                getter=lambda: getattr(patch, "filt_q"),
-#                setter=lambda x: setattr(patch,"filt_q",x),
-#                minval=0.1, maxval=2.5,
-#                fmt="%1.1f"),
-#     ParamRange(param_group[2], 0,
-#                getter=lambda: patch.wave_mix,
-#                setter=lambda x: setattr(patch,"wave_mix",x),
-#                minval=0.0, maxval=1.0,
-#                fmt="%1.1f"),
-#     ParamRange(param_group[3], 0,
-#                getter=lambda: patch.wave_mix_lfo_amount,
-#                setter=lambda x: setattr(patch,"wave_mix_lfo_amount",x),
-#                minval=0.0, maxval=1.0,
-#                fmt="%1.1f")
-# ]
 
 def handle_midi():
     while msg := midi_usb_in.receive() or midi_uart_in.receive():
@@ -170,7 +154,7 @@ def handle_touch():
 
 
 knobA, knobB = hw.read_pots()  # returns 0-255 values
-synthui = SynthUI(hw.display, params, knobA//2, knobB//2)
+synthui = SynthUI(hw.display, params, knobA, knobB)
 
 last_time = 0
 p = 0
@@ -189,8 +173,8 @@ while True:
             print("select_pair:", p)
             
     knobA, knobB = hw.read_pots()
-    synthui.setA( knobA // 2 )
-    synthui.setB( knobB // 2 )
+    synthui.setA( knobA )
+    synthui.setB( knobB )
     
     if time.monotonic() - last_time > 0.5:
        last_time = time.monotonic()
