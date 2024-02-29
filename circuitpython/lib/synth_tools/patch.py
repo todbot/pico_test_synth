@@ -61,7 +61,6 @@ class WaveType:
 
 class Patch:
     """ Patch is a serializable data structure for the Instrument's settings
-    FIXME: patches should have names too, tod
     """
     def __init__(self, name, wave_type=WaveType.OSC, wave='SAW', detune=1.01,
                  filt_type="LP", filt_f=8000, filt_q=1.2,
@@ -71,8 +70,8 @@ class Patch:
         self.wave = wave
         self.waveB = None
         self.wave_mix = 0.0  # 0 = wave, 1 = waveB
-        self.wave_mix_lfo_amount = 3
-        self.wave_mix_lfo_rate = 0.5
+        self.wave_mix_lfo_amount = 3  # FIXME: what is this range
+        self.wave_mix_lfo_rate = 0.5  # Hz
         self.wave_dir = '/wav'
         self.detune = detune
         self.filt_type = filt_type   # allowed values:

@@ -1,4 +1,4 @@
-
+import asyncio
 import time
 import usb_midi
 import displayio, terminalio, vectorio
@@ -98,86 +98,92 @@ params = (
                setter=lambda x: inst.set_volume(x)),
 )
 
-
-def handle_midi():
-    while msg := midi_usb_in.receive() or midi_uart_in.receive():
-        if msg.type == smolmidi.NOTE_ON:
-            inst.note_on(msg.data[0])
-            hw.set_led(0xff00ff)
-        elif msg.type == smolmidi.NOTE_OFF:
-            inst.note_off(msg.data[0])
-            hw.set_led(0x000000)
-        elif msg.type == smolmidi.CC:
-            ccnum = msg.data[0]
-            ccval = msg.data[1]
-            # hw.set_led(ccval)
-            # if ccnum == 71:  # "sound controller 1"
-            #     new_wave_mix = ccval/127
-            #     print("wave_mix:", new_wave_mix)
-            #     inst.patch.wave_mix = new_wave_mix
-            # elif ccnum == 1:  # mod wheel
-            #     inst.patch.wave_mix_lfo_amount = ccval/127 * 50
-            #     # inst.patch.wave_mix_lfo_rate = msg.value/127 * 5
-            # elif ccnum == 74:  # filter cutoff
-            #     inst.patch.filt_f = ccval/127 * 8000
-
-notes_pressed = [None] * len(hw.touches)
-button_held = False
-button_with_touch = False
-
-def handle_touch():
-    global button_held, button_with_touch
-    if touches := hw.check_touch():
-        for touch in touches:
-            if touch.pressed:
-                if button_held:  # load a patch
-                    print("load patch", touch.key_number)
-                    # disable this for now
-                    #  inst.load_patch(patches[i])
-                    #  hw.patch = patches[i]
-                    #wavedisp.display_update()
-                    #button_with_touch = True
-                else:  # trigger a note
-                    midi_note = touch_midi_notes[touch.key_number]
-                    midi_note += (inst.patch.octave*12)
-                    notes_pressed[touch.key_number] = midi_note
-                    inst.note_on(midi_note)
-                    hw.set_led(0xff00ff)
-
-            if touch.released:
-                if button_with_touch:
-                    button_with_touch = False
-                else:
-                    midi_note = notes_pressed[touch.key_number]
-                    inst.note_off(midi_note)
-                    hw.set_led(0)
-
-
 knobA, knobB = hw.read_pots()  # returns 0-255 values
 synthui = SynthUI(hw.display, params, knobA, knobB)
 
-last_time = 0
-p = 0
-while True:
-    hw.display.refresh()
-    
-    inst.update()
-    
-    handle_midi()
-    handle_touch()
-    
-    if button := hw.check_button():
-        if button.pressed:
-            p = (p+1) % (synthui.num_params//2)
-            synthui.select_pair(p)
-            print("select_pair:", p)
-            
-    knobA, knobB = hw.read_pots()
-    synthui.setA( knobA )
-    synthui.setB( knobB )
-    
-    if time.monotonic() - last_time > 0.5:
-       last_time = time.monotonic()
-       print("patch:", inst.patch)
+async def instrument_updater():
+    while True:
+        inst.update()
+        await asyncio.sleep(0.01)  # as fast as possible
+        
+async def midi_handler():
+    while True:
+        while msg := midi_usb_in.receive() or midi_uart_in.receive():
+            if msg.type == smolmidi.NOTE_ON:
+                inst.note_on(msg.data[0])
+                hw.set_led(0xff00ff)
+            elif msg.type == smolmidi.NOTE_OFF:
+                inst.note_off(msg.data[0])
+                hw.set_led(0x000000)
+            elif msg.type == smolmidi.CC:
+                ccnum = msg.data[0]
+                ccval = msg.data[1]
+                # hw.set_led(ccval)
+                # if ccnum == 71:  # "sound controller 1"
+                #     new_wave_mix = ccval/127
+                #     print("wave_mix:", new_wave_mix)
+                #     inst.patch.wave_mix = new_wave_mix
+                # elif ccnum == 1:  # mod wheel
+                #     inst.patch.wave_mix_lfo_amount = ccval/127 * 50
+                #     # inst.patch.wave_mix_lfo_rate = msg.value/127 * 5
+                # elif ccnum == 74:  # filter cutoff
+                #     inst.patch.filt_f = ccval/127 * 8000
+        await asyncio.sleep(0.001)
 
+
+async def ui_handler():
+    notes_pressed = [None] * len(hw.touches)
+    button_held = False
+    button_with_touch = False
+    p = 0
+    
+    while True:
+        hw.display.refresh()
+    
+        knobA, knobB = hw.read_pots()
+        synthui.setA( knobA )
+        synthui.setB( knobB )
+    
+        if button := hw.check_button():
+            if button.pressed:
+                p = (p+1) % (synthui.num_params//2)
+                synthui.select_pair(p)
+                print("select_pair:", p)
+                
+        if touches := hw.check_touch():
+            for touch in touches:
+                
+                if touch.pressed:
+                    if button_held:  # load a patch
+                        print("load patch", touch.key_number)
+                        # disable this for now
+                        #  inst.load_patch(patches[i])
+                        #  hw.patch = patches[i]
+                        #wavedisp.display_update()
+                        #button_with_touch = True
+                    else:  # trigger a note
+                        midi_note = touch_midi_notes[touch.key_number]
+                        midi_note += (inst.patch.octave*12)
+                        notes_pressed[touch.key_number] = midi_note
+                        inst.note_on(midi_note)
+                        hw.set_led(0xff00ff)
+
+                if touch.released:
+                    if button_with_touch:
+                        button_with_touch = False
+                    else:
+                        midi_note = notes_pressed[touch.key_number]
+                        inst.note_off(midi_note)
+                        hw.set_led(0)
+        await asyncio.sleep(0.005)
+    
+
+print("--- pico_test_synth wavesynth ready ---")
+
+async def main():
+    task1 = asyncio.create_task(ui_handler())
+    task2 = asyncio.create_task(midi_handler())
+    task3 = asyncio.create_task(instrument_updater())
+    await asyncio.gather(task1, task2, task3)
+asyncio.run(main())
 

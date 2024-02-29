@@ -134,7 +134,7 @@ class WavePolyTwoOsc(Instrument):
             # let Wavetable do the work  # FIXME: don't need to do this per osc1 yeah?
             if self.patch.wave_type == WaveType.WTB:
                 self.wave_lfo.a.rate = self.patch.wave_mix_lfo_rate  # FIXME: danger
-                wave_pos = self.wave_lfo.value * self.patch.wave_mix_lfo_amount * 10
+                wave_pos = self.wave_lfo.value * self.patch.wave_mix_lfo_amount * 10  # FIXME what is this range
                 wave_pos += self.patch.wave_mix * self.wavetable.num_waves
                 self.wavetable.set_wave_pos( wave_pos )
 
