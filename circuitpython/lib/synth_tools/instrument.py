@@ -13,19 +13,32 @@ except:
 from synth_tools.patch import Patch, WaveType
 from synth_tools.waves import Waves, Wavetable, lerp
 
-# a very simple instrument
 class Instrument():
-
+    """
+    Simple instrument to be used with synthio
+    """
+    
     def __init__(self, synth, patch=None):
         self.synth = synth
         self.patch = patch or Patch('init')
         self.voices = {}  # keys = midi note, vals = oscs
 
     def update(self):
+        """
+        Update internal instrument state.  The update() method should be
+        called regularly and as fast as possible, so the instrument can
+        update things like filter envelopes and wave mixing.
+        This base instrument does nothing but print to REPL currently-sounding
+        notes.
+        """
         for v in self.voices:
             print("note:",v)
 
     def note_on(self, midi_note, midi_vel=127):
+        """
+        Turn on a synthesizer note, using standard MIDI note & velocity values.
+        Currently playing notes are kept track of internally.
+        """
         # FIXME: deal with multiple note_ons of same note
         f = synthio.midi_to_hz(midi_note)
         amp_env = self.patch.amp_env_params.make_env()
@@ -34,24 +47,27 @@ class Instrument():
         self.synth.press( voice )
 
     def note_off(self, midi_note, midi_vel=0):
+        """Turn off a synthesizer note, using stadnard MIDI note & velocity values."""
         voice = self.voices.get(midi_note, None)
         if voice:
             self.synth.release(voice)
             self.voices.pop(midi_note)  # FIXME: need to run filter after release cycle
 
 #
-class MonoOsc(Instrument):
-    def __init__(self, synth, patch):
-        super().__init__(synth)
-        self.load_patch(patch)
+# class MonoOsc(Instrument):
+#     def __init__(self, synth, patch):
+#         super().__init__(synth)
+#         self.load_patch(patch)
 
 
 #
 class WavePolyTwoOsc(Instrument):
-    #Voice = namedtuple("Voice", "osc1 osc2 filt_env amp_env")   # idea:
     """
-    This is a two-oscillator per voice subtractive synth patch
-    with a low-pass filter w/ filter envelope and an amplitude envelope
+    This implementation of Instrument is a two-oscillator per voice
+    subtractive synth with detunable oscillators,
+    with configurable filter w/ filter envelope and an amplitude envelope.
+    Each oscillator can also be a customized wavetable with wavemixing
+    between two different waveforms.
     """
     def __init__(self, synth, patch):
         super().__init__(synth)
@@ -89,6 +105,7 @@ class WavePolyTwoOsc(Instrument):
         #self.filt_env_wave = Waves.lfo_triangle()  # FIXME
 
     def reload_patch(self):
+        """Reload the set patch, turns off all notes"""
         self.note_off_all()
         self.synth.blocks.clear()  # clear out global wavetable LFOs (if any)
         self.load_patch(self.patch)
@@ -122,6 +139,7 @@ class WavePolyTwoOsc(Instrument):
         
 
     def update(self):
+        """Update filter envelope and wave-mixing, must be called frequently"""
         for (osc1,osc2,filt_env,amp_env) in self.voices.values():
 
             # let Wavetable do the work  # FIXME: don't need to do this per osc1 yeah?
@@ -175,10 +193,12 @@ class WavePolyTwoOsc(Instrument):
         #print("note_off: blocks:", self.synth.blocks)
 
     def note_off_all(self):
+        """Turn off all currently playing notes"""
         for n in self.voices.keys():
             print("note_off_all:",n)
             self.note_off(n)
 
     def redetune(self):
+        """Update detune settings in realtime"""
         for (osc1,osc2,filt_env,amp_env) in self.voices.values():
             osc2.frequency = osc1.frequency * self.patch.detune
