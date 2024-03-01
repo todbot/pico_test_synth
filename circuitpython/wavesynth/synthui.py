@@ -13,7 +13,7 @@ class SynthUI(displayio.Group):
         self.params = params
         self.num_params = len(params)
         
-        self.cluster = GaugeCluster(self.num_params, x=2, y=4, width=7, height=20, xstride=2.5)
+        self.cluster = GaugeCluster(self.num_params, x=1, y=4, width=6, height=20, xstride=2.3)
         self.append(self.cluster.gauges)
         self.append(self.cluster.select_lines)  # indicates which param set is editable
         fnt = terminalio.FONT

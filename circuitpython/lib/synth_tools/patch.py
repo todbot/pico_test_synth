@@ -23,7 +23,7 @@ class LFOParams:
 class EnvParams():
     """
     """
-    def __init__(self, attack_time=0.1, decay_time=0.01, release_time=0.2, attack_level=0.8, sustain_level=0.8):
+    def __init__(self, attack_time=0.1, decay_time=0.01, release_time=0.2, attack_level=1.0, sustain_level=1.0):
         self.attack_time = attack_time
         self.decay_time = decay_time
         self.release_time = release_time
@@ -37,17 +37,7 @@ class EnvParams():
                                 attack_level = self.attack_level,
                                 sustain_level = self.sustain_level)
 
-# class FiltType:
-#     """ """
-#     LP = const(0)
-#     HP = const(1)
-#     BP = const(2)
-#     def str(t):
-#         if t==LP: return 'LP'
-#         elif t==HP: return 'HP'
-#         elif t==BP: return 'BP'
-#         return 'UN'
-
+# FIXME: this needs a rethink
 class WaveType:
     OSC = const(0)
     WTB = const(1)
@@ -77,10 +67,10 @@ class Patch:
         self.filt_type = filt_type   # allowed values:
         self.filt_f = filt_f
         self.filt_q = filt_q
-        self.filt_env_params = filt_env_params or EnvParams()
-        self.amp_env_params = amp_env_params or EnvParams()
+        self.filt_env_amount = 0
+        self.filt_env = filt_env_params or EnvParams()
+        self.amp_env = amp_env_params or EnvParams()
         self.octave = 0
-        self.volume = 1
 
     def wave_select(self):
         """Construct a 'wave_select' string from patch parts"""
@@ -114,4 +104,19 @@ class Patch:
             if path.endswith('.WAV') and not path.startswith('.'):
                 wave_selects.append("wtb:"+path.replace('.WAV',''))
         return wave_selects
+
+    def get_filter_types(self):
+        return ("LP", "BP", "HP") 
+    
+# class FiltType:
+#     """ """
+#     LP = const(0)
+#     HP = const(1)
+#     BP = const(2)
+#     def str(t):
+#         if t==LP: return 'LP'
+#         elif t==HP: return 'HP'
+#         elif t==BP: return 'BP'
+#         return 'UN'
+
     

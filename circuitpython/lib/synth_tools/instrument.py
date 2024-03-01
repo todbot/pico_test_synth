@@ -65,7 +65,8 @@ class WavePolyTwoOsc(Instrument):
 
         self.synth.blocks.clear()   # remove any global LFOs
 
-        raw_lfo1 = synthio.LFO(rate = 0.3)  #, scale=0.5, offset=0.5)  # FIXME: set lfo rate by patch param
+        #raw_lfo1 = synthio.LFO(rate = 0.3)  #, scale=0.5, offset=0.5)  # FIXME: set lfo rate by patch param
+        raw_lfo1 = synthio.LFO(rate = self.patch.wave_mix_lfo_rate) 
         lfo1 = synthio.Math( synthio.MathOperation.SCALE_OFFSET, raw_lfo1, 0.5, 0.5) # unipolar
         self.wave_lfo = lfo1
         self.synth.blocks.append(lfo1)  # global lfo for wave_lfo
@@ -85,7 +86,7 @@ class WavePolyTwoOsc(Instrument):
             self.wavetable = Wavetable(patch.wave_dir+"/"+patch.wave+".WAV")
             self.waveform = self.wavetable.waveform
 
-        self.filt_env_wave = Waves.lfo_triangle()  # FIXME
+        #self.filt_env_wave = Waves.lfo_triangle()  # FIXME
 
     def reload_patch(self):
         self.note_off_all()
@@ -93,31 +94,23 @@ class WavePolyTwoOsc(Instrument):
         self.load_patch(self.patch)
 
     def _update_filter(self, osc1, osc2, filt_env):
-        filt_q = self.patch.filt_q
-        filt_mod = 0
-        filt_f = 0
-        filt = None
-
         # prevent filter instability around note frequency
         # must do this for each voice
         #if self.patch.filt_f / osc1.frequency < 1.2:  filt_q = filt_q / 2
         #filt_f = max(self.patch.filt_f * filt_env.value, osc1.frequency*0.75) # filter unstable <oscfreq?
         #filt_f = max(self.patch.filt_f * filt_env.value, 0) # filter unstable <100?
         
+        filt_amount = self.patch.filt_env_amount
+        filt_fmax = 8000   # FIXME: put this and a filt_fmin somewhere (instrument?)
+        filt_mod = filt_amount * filt_fmax * (filt_env.value/2)  # 8k/2 = max freq
+        filt_f = min(max(self.patch.filt_f + filt_mod, 60), 8000)
+        filt_q = self.patch.filt_q
+        filt = None
         if self.patch.filt_type == "LP":
-            #if self.patch.filt_env_params.attack_time > 0:
-            #filt_mod = max(0, 0.5 * 8000 * (filt_env.value/2))  # 8k/2 = max freq, 0.5 = filtermod amt
-            filt_f = self.patch.filt_f + filt_mod
             filt = self.synth.low_pass_filter( filt_f,filt_q )
-            
         elif self.patch.filt_type == "HP":
-            #filt_mod = max(0, 0.5 * 8000 * (filt_env.value/2))  # 8k/2 = max freq, 0.5 = filtermod amt
-            filt_f = self.patch.filt_f + filt_mod
             filt = self.synth.high_pass_filter( filt_f,filt_q )
-            
         elif self.patch.filt_type == "BP":
-            #filt_mod = max(0, 0.5 * 8000 * (filt_env.value/2))  # 8k/2 = max freq, 0.5 = filtermod amt
-            filt_f = self.patch.filt_f + filt_mod
             filt = self.synth.band_pass_filter( filt_f,filt_q )
         else:
             print("unknown filt_type:", self.patch.filt_type)
@@ -152,13 +145,15 @@ class WavePolyTwoOsc(Instrument):
             
 
     def note_on(self, midi_note, midi_vel=127):
-        amp_env = self.patch.amp_env_params.make_env()
+        amp_env = self.patch.amp_env.make_env()
 
-        #filt_env = self.patch.filt_env_params.make_env()  # synthio.Envelope.value does not exist
-        # fake an envelope with an LFO in 'once' mode
-        filt_env = synthio.LFO(once=True, scale=0.9, offset=1.01,
-                               waveform=self.filt_env_wave,
-                               rate=self.patch.filt_env_params.attack_time, ) # always positve
+        filt_env_wave = Waves.from_ar_times( self.patch.filt_env.attack_time,
+                                             self.patch.filt_env.release_time )
+        filt_env_time = (self.patch.filt_env.attack_time  +
+                         self.patch.filt_env.release_time)
+        filt_env_rate = 1 / filt_env_time  # guaranteed to never be zero
+        filt_env = synthio.LFO(once=True, scale=0.9, offset=1.01, # fixme: make always positve
+                               waveform=filt_env_wave, rate=filt_env_rate ) 
 
         f = synthio.midi_to_hz(midi_note)
         osc1 = synthio.Note( frequency=f, waveform=self.waveform, envelope=amp_env )

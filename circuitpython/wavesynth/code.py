@@ -14,12 +14,14 @@ from synthui import SynthUI
 
 import microcontroller
 microcontroller.cpu.frequency = 250_000_000
-time.sleep(2)
+
+#time.sleep(2)  # let USB quiet down (when debugging)
 
 touch_midi_notes = list(range(45, 45+16))  # notes touch keyboard sends FIXME
 
 print("hardware...")
 hw = Hardware()
+hw.set_volume(0.7)
 
 # let's get the midi going
 midi_usb_in = smolmidi.MidiIn(usb_midi.ports[0])
@@ -29,73 +31,71 @@ midi_uart_in = smolmidi.MidiIn(hw.midi_uart)
 patch1 = Patch('oneuno')
 patch2 = Patch('twotoo')
 
-patch1.amp_env_params.attack_time = 0.01
-patch1.amp_env_params.release_time = 0.3
-patch1.filt_env_params.attack_time = 1.1
-patch1.filt_env_params.release_time = 0.8
+patch1.amp_env.attack_time = 0.01
+patch1.amp_env.release_time = 0.3
+patch1.filt_env.attack_time = 1.1
+patch1.filt_env.release_time = 0.8
 patch1.filt_f = 2345
 patch1.filt_q = 1.7
 patch1.waveB = 'SQU'
-patch1.wave_mix_lfo_amount = 0
+patch1.wave_mix_lfo_amount = 0.3
 patch1.detune = 1.01
 
 patch2.filt_type = "HP"
 patch2.wave = 'square'
 patch2.detune = 1.01
-patch2.filt_env_params.attack_time = 0.0  # turn off filter  FIXME
-patch2.amp_env_params.release_time = 1.0
+patch2.filt_env.attack_time = 0.0  # turn off filter  FIXME
+patch2.amp_env.release_time = 1.0
 
 patch = patch1
 inst = WavePolyTwoOsc(hw.synth, patch)
 
 wave_selects = patch.generate_wave_selects()
-filter_types = ("LP","BP","HP")
+filter_types = patch.get_filter_types()
 
 def update_wave_select(wave_select_idx):
     wave_select = wave_selects[wave_select_idx]
-    #print("update_wave_select:",wave_select_idx, wave_select)
     inst.patch.set_by_wave_select(wave_select)
     inst.reload_patch()
 
-# def update_octave(x):
-#     global octave
-#     octave = x
-import math
-
+# set of parameter pairs adjustable by the user
 params = (
     ParamRange("FiltFreq", "filter frequency", 1234, "%4d", 60, 8000,
-               setter=lambda x: setattr(patch,"filt_f",x)),
+               setter=lambda x: setattr(patch,"filt_f", x)),
     ParamRange("FilterRes", "filter resonance", 0.7, "%1.2f", 0.1, 2.5,
-               setter=lambda x: setattr(patch,"filt_q",x)),
+               setter=lambda x: setattr(patch,"filt_q", x)),
     
     ParamRange("WaveMix", "wave mix", 0.2, "%.2f", 0.0, 0.99,
-               setter=lambda x: setattr(patch,"wave_mix",x)),
+               setter=lambda x: setattr(patch,"wave_mix", x)),
     ParamChoice("WaveSel", "wave select", 0, wave_selects,
                 setter=lambda x: update_wave_select(x)),  # FIXME: requires reload patch
     
     ParamRange("WavLFO", "wave lfo amount", 0.3, "%2.1f", 0.0, 10,
-               setter=lambda x: setattr(patch,"wave_mix_lfo_amount",x)),
+               setter=lambda x: setattr(patch,"wave_mix_lfo_amount", x)),
     
     ParamRange("WavRate", "wave lfo rate", 0.3, "%2.1f", 0.0, 5,
-               setter=lambda x: setattr(patch,"wave_mix_lfo_rate",x)),
+               setter=lambda x: setattr(patch,"wave_mix_lfo_rate", x)),
     
-    # ParamChoice("FiltType", "filter type", 0, filter_types,
-    #             setter=lambda x: setattr(patch,"filt_type",filter_types[x])),
-     
     ParamRange("AmpAtk", "attack time", 0.1, "%1.2f", 0.01, 3.0,
-               setter=lambda x: setattr(patch.amp_env_params,"attack_time",x)),
+               setter=lambda x: setattr(patch.amp_env,"attack_time", x)),
     ParamRange("AmpRls", "release time", 0.3, "%1.2f", 0.1, 3.0,
-               setter=lambda x: setattr(patch.amp_env_params,"release_time",x)),
+               setter=lambda x: setattr(patch.amp_env,"release_time", x)),
     
     ParamRange("FiltAtk", "filter attack ", 1.1, "%1.2f", 0.01, 5.0,
-               setter=lambda x: setattr(patch.filt_env_params,"attack_time",x)),
+               setter=lambda x: setattr(patch.filt_env,"attack_time", x)),
     ParamRange("FiltRls", "filter release", 0.8, "%1.2f", 0.1, 5.0,
-               setter=lambda x: setattr(patch.filt_env_params,"release_time",x)),
+               setter=lambda x: setattr(patch.filt_env,"release_time", x)),
 
+    ParamRange("FiltEnv", "filter env amount", 0, "%.2f", -0.99, 0.99,
+               setter=lambda x: setattr(patch, "filt_env_amount", x) ),
+    ParamChoice("FiltType", "filter type", 0, filter_types,
+                setter=lambda x: setattr(patch,"filt_type",filter_types[x])),
+    
     ParamRange("Octave", "octave range", 0, "%d", -3, 2,
                setter=lambda x: setattr(patch, "octave",int(x)) ),
-    ParamRange("Volume", "volume", 1.0, "%1.2f", 0.1, 1.0,
-               setter=lambda x: inst.set_volume(x)),
+    ParamRange("Volume", "volume", 0.7, "%1.2f", 0.1, 1.0,
+               setter=lambda x: hw.set_volume(x)),
+
 )
 
 knobA, knobB = hw.read_pots()  # returns 0-255 values
@@ -135,7 +135,7 @@ async def ui_handler():
     notes_pressed = [None] * len(hw.touches)
     button_held = False
     button_with_touch = False
-    p = 0
+    p = 0  # which param pair we're looking at
     
     while True:
         hw.display.refresh()
@@ -146,9 +146,12 @@ async def ui_handler():
     
         if button := hw.check_button():
             if button.pressed:
-                p = (p+1) % (synthui.num_params//2)
+                button_held = True
+            if button.released:
+                button_held = False
+                p = (p+1) % (synthui.num_params//2)  # go to next param pair
                 synthui.select_pair(p)
-                print("select_pair:", p)
+                print("select param pair:", p)
                 
         if touches := hw.check_touch():
             for touch in touches:
@@ -157,10 +160,8 @@ async def ui_handler():
                     if button_held:  # load a patch
                         print("load patch", touch.key_number)
                         # disable this for now
-                        #  inst.load_patch(patches[i])
-                        #  hw.patch = patches[i]
-                        #wavedisp.display_update()
-                        #button_with_touch = True
+                        # inst.load_patch(patches[i])
+                        # wavedisp.display_update()
                     else:  # trigger a note
                         midi_note = touch_midi_notes[touch.key_number]
                         midi_note += (inst.patch.octave*12)

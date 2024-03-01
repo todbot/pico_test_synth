@@ -62,7 +62,7 @@ class Waves:
         pass
 
     def from_list( vals ):
-        print("Waves.from_list: vals=",vals)
+        #print("Waves.from_list: vals=",vals)
         return np.array( [int(v) for v in vals], dtype=np.int16 )
 
     def lfo_ramp_up_pos():
@@ -76,6 +76,19 @@ class Waves:
 
     def lfo_triangle():
         return np.array( (0, 32767, 0, -32767), dtype=np.int16)
+
+    def from_ar_times(attack_time=1, release_time=1):
+        """
+        Generate a fake Attack/Release 'Envelope' using an LFO waveform.
+        This is a dumb way of doing it, but since we cannot get .value()
+        out of Envelope, we have to fake it with an LFO.        
+        """
+        #s = attack_time + release_time
+        a10 = int(attack_time * 10)
+        r10 = int(release_time*10)
+        a = [i*65535//a10 - 32767 for i in range(a10)]
+        r = [32767 - i*65535//r10 for i in range(r10)]
+        return Waves.from_list(a + [32767,] + r)  # add a max middle 
 
     def wav(filepath, size=256, pos=0):
         with adafruit_wave.open(filepath) as w:
