@@ -68,6 +68,9 @@ def from_dict(d,cls):
             setattr(obj, propname, from_dict(d[propname], childcls))  # go deeper
     return obj
 
+def copy(obj):
+    """Copy an object, by passing it through dict space"""
+    return from_dict(to_dict(obj), obj.__class__)
 
 def to_json(obj):
     """

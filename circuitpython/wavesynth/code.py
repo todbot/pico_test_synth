@@ -9,7 +9,7 @@ from synth_tools.patch import Patch
 from synth_tools.instrument import PolyWaveSynth
 from synth_tools.param import ParamRange, ParamChoice
 import synth_tools.winterbloom_smolmidi as smolmidi
-from synth_tools.patch_saver import load_patches, save_patches
+from synth_tools.patch_saver import load_patches, save_patches, copy
 
 from synthui import SynthUI
 
@@ -45,8 +45,9 @@ if not patches:
     patches = [patch0, Patch('two'), Patch('three'), Patch('four'),
                Patch('five'), Patch('six'), Patch('seven'),]
 
+patchi = 0  # not really liking this patchi business
 patch = patches[0]
-inst = PolyWaveSynth(hw.synth, patch)
+inst = PolyWaveSynth(hw.synth, patches[patchi])
 
 # some utilities for the Params below
 wave_selects = patch.generate_wave_selects()
@@ -58,16 +59,21 @@ def update_wave_select(wave_select_idx):
     inst.reload_patch()
 
 # set of parameter pairs adjustable by the user
+# FIXME: need a way to reset all these Params when a Patch changes
 params = (
     ParamRange("FiltFreq", "filter frequency", 1234, "%4d", 60, 8000,
-               setter=lambda x: setattr(patch,"filt_f", x)),
+               setter=lambda x: setattr(patch,"filt_f", x),
+               getter=lambda: getattr(patch,"filt_f")),
     ParamRange("FilterRes", "filter resonance", 0.7, "%1.2f", 0.1, 2.5,
-               setter=lambda x: setattr(patch,"filt_q", x)),
+               setter=lambda x: setattr(patch,"filt_q", x),
+               getter=lambda: getattr(patch,"filt_q")),
     
     ParamRange("WaveMix", "wave mix", 0.2, "%.2f", 0.0, 0.99,
-               setter=lambda x: setattr(patch,"wave_mix", x)),
+               setter=lambda x: setattr(patch,"wave_mix", x),
+               getter=lambda: getattr(patch,"wave_mix")),
     ParamChoice("WaveSel", "wave select", 0, wave_selects,
-                setter=lambda x: update_wave_select(x)),  # FIXME: requires reload patch
+                setter=lambda x: update_wave_select(x),
+                getter=lambda: getattr(patch,"wave_select")),
     
     ParamRange("WavLFO", "wave lfo amount", 0.3, "%2.1f", 0.0, 10,
                setter=lambda x: setattr(patch,"wave_mix_lfo_amount", x)),
@@ -96,6 +102,10 @@ params = (
                setter=lambda x: hw.set_volume(x)),
 
 )
+
+def update_params():
+    for p in params:
+        p.update()
 
 knobA, knobB = hw.read_pots()  # returns 0-255 values
 synthui = SynthUI(hw.display, params, knobA, knobB)
@@ -147,19 +157,32 @@ async def ui_handler():
             if button.pressed:
                 button_held = True
             if button.released:
+                # only advance UI if not doing patch loading gesture
+                if not button_with_touch:
+                    p = (p+1) % (synthui.num_params//2)  # go to next param pair
+                    synthui.select_pair(p)
+                    print("select param pair:", p)
                 button_held = False
-                p = (p+1) % (synthui.num_params//2)  # go to next param pair
-                synthui.select_pair(p)
-                print("select param pair:", p)
+                button_with_touch = False
                 
         if touches := hw.check_touch():
             for touch in touches:
                 
                 if touch.pressed:
                     if button_held:  # load a patch
+                        button_with_touch = True
                         if touch.key_number == 15:  # make this be save key
                             save_patches(patches)
+                        if touch.key_number < len(patches):
+                            patchi = touch.key_number
+                            patch = patches[patchi]
+                            update_params()
+                            inst.note_off_all()
+                            inst.load_patch( patch )
+                            print("loaded patch #",patchi)
+                            
                     else:  # trigger a note
+                        button_with_touch = False
                         midi_note = touch_midi_notes[touch.key_number]
                         midi_note += (inst.patch.octave*12)
                         notes_pressed[touch.key_number] = midi_note
@@ -168,7 +191,7 @@ async def ui_handler():
 
                 if touch.released:
                     if button_with_touch:
-                        button_with_touch = False
+                        pass
                     else:
                         midi_note = notes_pressed[touch.key_number]
                         inst.note_off(midi_note)

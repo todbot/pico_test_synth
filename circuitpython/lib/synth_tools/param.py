@@ -24,13 +24,17 @@ class Param:
         self.val = val
 
 class ParamRange:
-    def __init__(self, name, fullname, val, fmt, minval, maxval, setter=None):
+    def __init__(self, name, fullname, val, fmt, minval, maxval, setter=None, getter=None):
         Param.__init__(self,name,fullname,val)
         self.fmt = fmt
         self.minval = minval
         self.maxval = maxval
         self.valrange = maxval-minval
         self.setter = setter
+        self.getter = getter
+        
+    def update(self):
+        if self.getter: self.val = self.getter()
         
     def get_text(self):
         return self.fmt % self.val  # text representation
@@ -42,12 +46,17 @@ class ParamRange:
     def get_by_gauge_val(self):
         return (self.val - self.minval)/(self.valrange) * 255
 
+
 class ParamChoice:
-    def __init__(self, name, fullname, val, choices, setter=None):
+    def __init__(self, name, fullname, val, choices, setter=None, getter=None):
         Param.__init__(self,name,fullname,val)
         self.choices = choices
         self.num_choices = len(choices)
         self.setter = setter
+        self.getter = getter
+        
+    def update(self):
+        if self.getter: self.val = self.getter()
         
     def get_text(self):
         return self.choices[self.val]  # text representation
