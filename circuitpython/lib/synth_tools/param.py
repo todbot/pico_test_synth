@@ -33,6 +33,12 @@ class ParamRange:
         self.setter = setter
         self.getter = getter
         
+    def __repr__(self):
+        return "ParamRange('%s', %s, %s,%s)" % (self.name,
+                                                self.fmt % self.val,
+                                                self.fmt % self.minval,
+                                                self.fmt % self.maxval)
+    
     def update(self):
         if self.getter: self.val = self.getter()
         
@@ -54,6 +60,8 @@ class ParamChoice:
         self.num_choices = len(choices)
         self.setter = setter
         self.getter = getter
+    def __repr__(self):
+        return "ParamChoice('%s', %s, %s)" % (self.name, self.val, self.choices)
         
     def update(self):
         if self.getter: self.val = self.getter()

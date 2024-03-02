@@ -57,7 +57,33 @@ class WaveType:
         return OSC
 
 
+def generate_wave_selects(wave_dir):
+    """
+    Generate a list of possible 'wave_select' values.
+    'wave_select's are a string shorthand for the wave_type/waveA/waveB
+    settings for a Patch.
+    """
+    wave_selects = [
+        "osc:SAW/TRI",
+        "osc:SAW/SQU",
+        "osc:SAW/SIN",
+        "osc:SQU/SIN",
+        "osc:SIN/NZE",
+    ]
+    # fixme: check for bad/none dir_path
+    for path in os.listdir(wave_dir):
+        path = path.upper()
+        if path.endswith('.WAV') and not path.startswith('.'):
+            wave_selects.append("wtb:"+path.replace('.WAV',''))
+    return wave_selects
+
+
+
 class Patch:
+    
+    wave_selects = generate_wave_selects('/wav')
+    filter_types = ("LP", "BP", "HP") 
+    
     """ Patch is a serializable data structure for the Instrument's settings
     """
     def __init__(self, name='initpatch', wave_type=WaveType.OSC, wave='SAW', detune=1.01,
@@ -66,7 +92,7 @@ class Patch:
         self.name = name
         self.wave_type = wave_type  # or 'osc' or 'wav' or 'wtb'
         self.wave = wave
-        self.waveB = None
+        self.waveB = 'TRI'
         self.wave_mix = 0.0  # 0 = wave, 1 = waveB
         self.wave_mix_lfo_amount = 3  # FIXME: what is this range
         self.wave_mix_lfo_rate = 0.5  # Hz
@@ -81,7 +107,8 @@ class Patch:
         self.octave = 0
 
     def wave_select(self):
-        """Construct a 'wave_select' string from patch parts"""
+        """Construct a 'wave_select' string from patch parts.
+        Used to summarize the wave_type/waveA/waveB settings."""
         waveB_str = "/"+self.waveB if self.waveB else ""
         waveA_str = self.wave.replace('.WAV','')  # if it's a wavetable
         wave_select = WaveType.str(self.wave_type) + ":" + waveA_str + waveB_str
@@ -99,23 +126,8 @@ class Patch:
             self.name, self.wave_select(), self.wave_mix,
             self.filt_f, self.filt_q)
 
-    def generate_wave_selects(self):   # fixme: why isn't this a Patch class method?
-        wave_selects = [
-            "osc:SAW/TRI",
-            "osc:SAW/SQU",
-            "osc:SAW/SIN",
-            "osc:SQU/SIN"
-        ]
-        # fixme: check for bad/none dir_path
-        for path in os.listdir(self.wave_dir):
-            path = path.upper()
-            if path.endswith('.WAV') and not path.startswith('.'):
-                wave_selects.append("wtb:"+path.replace('.WAV',''))
-        return wave_selects
-
-    def get_filter_types(self):
-        return ("LP", "BP", "HP") 
     
+
 # class FiltType:
 #     """ """
 #     LP = const(0)

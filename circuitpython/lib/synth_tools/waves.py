@@ -16,6 +16,7 @@ Part of synth_tools.
 
 import synthio
 import ulab.numpy as np
+import random
 
 try:
     import adafruit_wave
@@ -71,8 +72,7 @@ class Waves:
         return np.zeros(size, dtype=np.int16)
 
     def noise(size,volume):
-        # tbd
-        pass
+        return np.array([random.randint(-32767, 32767) for i in range(size)], dtype=np.int16)
 
     def from_list( vals ):
         #print("Waves.from_list: vals=",vals)

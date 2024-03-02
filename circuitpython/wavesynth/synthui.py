@@ -13,22 +13,26 @@ class SynthUI(displayio.Group):
         self.params = params
         self.num_params = len(params)
         
-        self.cluster = GaugeCluster(self.num_params, x=1, y=4, width=6, height=20, xstride=2.3)
+        self.cluster = GaugeCluster(self.num_params, x=1, y=3, width=6, height=20, xstride=2.3)
         self.append(self.cluster.gauges)
         self.append(self.cluster.select_lines)  # indicates which param set is editable
         fnt = terminalio.FONT
         cw = 0xFFFFFF
         
-        # text fields of the currently editable parameters
-        self.textA = label.Label(fnt, text="tA", color=cw, x=1, y=40, scale=2)
-        self.textB = label.Label(fnt, text="tB", color=cw, x=64, y=40, scale=2)
+        # text of the currently editable parameters
+        self.textA = label.Label(fnt, text="tA", color=cw, x=1, y=44, scale=2)
+        self.textB = label.Label(fnt, text="tB", color=cw, x=64, y=44, scale=2)
         
-        # labels above the currently ediable parameters
+        # labels for the currently editable parameters
         self.labelA = label.Label(fnt, text="labA", color=cw, x=1, y=58, scale=1)
         self.labelB = label.Label(fnt, text="labB", color=cw, x=104, y=58, scale=1)
         
         for l in (self.textA, self.textB, self.labelA, self.labelB):
             self.append(l)
+
+        # text for patch info
+        self.labelP = label.Label(fnt, text="patch:patchname", color=cw, x=20, y=28, scale=1)
+        self.append(self.labelP)
 
         for i in range(self.num_params):
             self.cluster.set_gauge_val(i, int(self.params[i].get_by_gauge_val()))
@@ -41,6 +45,9 @@ class SynthUI(displayio.Group):
         self.lastA = knobAval
         self.lastB = knobBval
         self.knobMin = 1
+
+    def set_patch_name(self,pname):
+        self.labelP.text="patch:"+pname        
 
     def _fix_textB_right_justified(self):
         self.textB.scale=2

@@ -46,69 +46,111 @@ if not patches:
                Patch('five'), Patch('six'), Patch('seven'),]
 
 patchi = 0  # not really liking this patchi business
-patch = patches[0]
-inst = PolyWaveSynth(hw.synth, patches[patchi])
+patch = patches[patchi]
+inst = PolyWaveSynth(hw.synth, patch)
 
 # some utilities for the Params below
-wave_selects = patch.generate_wave_selects()
-filter_types = patch.get_filter_types()
+wave_selects = Patch.wave_selects
+filter_types = Patch.filter_types
 
 def update_wave_select(wave_select_idx):
-    wave_select = wave_selects[wave_select_idx]
+    wave_select = Patch.wave_selects[wave_select_idx]
     inst.patch.set_by_wave_select(wave_select)
     inst.reload_patch()
+    
+def get_wave_select_idx():
+    wave_select = getattr(patch, "wave_select")()  # note: this is a func
+    # FIXME: this changes the patch
+    if wave_select not in Patch.wave_selects:
+        print("patch:'%s' wave_select '%s' not in wave_selects" % (patch.name, wave_select))
+        wave_select = Patch.wave_selects[0]
+        patch.set_by_wave_select(wave_select)
+        print("patch: wave_select new:",patch.wave_select())
+    idx = Patch.wave_selects.index(wave_select)
+    print("get_wave_select_idx:",idx)
+    return idx
 
 # set of parameter pairs adjustable by the user
 # FIXME: need a way to reset all these Params when a Patch changes
 params = (
+    # Pair 0
     ParamRange("FiltFreq", "filter frequency", 1234, "%4d", 60, 8000,
-               setter=lambda x: setattr(patch,"filt_f", x),
-               getter=lambda: getattr(patch,"filt_f")),
+               setter=lambda x: setattr(patch, "filt_f", x),
+               getter=lambda: getattr(patch, "filt_f")),
     ParamRange("FilterRes", "filter resonance", 0.7, "%1.2f", 0.1, 2.5,
-               setter=lambda x: setattr(patch,"filt_q", x),
-               getter=lambda: getattr(patch,"filt_q")),
+               setter=lambda x: setattr(patch, "filt_q", x),
+               getter=lambda: getattr(patch, "filt_q")),
     
+    # Pair 1
     ParamRange("WaveMix", "wave mix", 0.2, "%.2f", 0.0, 0.99,
-               setter=lambda x: setattr(patch,"wave_mix", x),
-               getter=lambda: getattr(patch,"wave_mix")),
+               setter=lambda x: setattr(patch, "wave_mix", x),
+               getter=lambda: getattr(patch, "wave_mix")),
     ParamChoice("WaveSel", "wave select", 0, wave_selects,
                 setter=lambda x: update_wave_select(x),
-                getter=lambda: getattr(patch,"wave_select")),
+                getter=lambda: get_wave_select_idx()),
+                #getter=lambda: wave_selects.index(getattr(patch, "wave_select")()) ),
     
+    # Pair 2
     ParamRange("WavLFO", "wave lfo amount", 0.3, "%2.1f", 0.0, 10,
-               setter=lambda x: setattr(patch,"wave_mix_lfo_amount", x)),
-    
+               setter=lambda x: setattr(patch, "wave_mix_lfo_amount", x),
+               getter=lambda: getattr(patch, "wave_mix_lfo_amount")),
     ParamRange("WavRate", "wave lfo rate", 0.3, "%2.1f", 0.0, 5,
-               setter=lambda x: setattr(patch,"wave_mix_lfo_rate", x)),
+               setter=lambda x: setattr(patch, "wave_mix_lfo_rate", x),
+               getter=lambda: getattr(patch, "wave_mix_lfo_rate")
+               ),
     
+    # Pair 3
     ParamRange("AmpAtk", "attack time", 0.1, "%1.2f", 0.01, 3.0,
-               setter=lambda x: setattr(patch.amp_env,"attack_time", x)),
+               setter=lambda x: setattr(patch.amp_env,"attack_time", x),
+               getter=lambda: getattr(patch.amp_env, "attack_time")
+               ),
     ParamRange("AmpRls", "release time", 0.3, "%1.2f", 0.1, 3.0,
-               setter=lambda x: setattr(patch.amp_env,"release_time", x)),
+               setter=lambda x: setattr(patch.amp_env,"release_time", x),
+               getter=lambda: getattr(patch.amp_env, "release_time")
+               ),
     
+    # Pair 4
     ParamRange("FiltAtk", "filter attack ", 1.1, "%1.2f", 0.01, 5.0,
-               setter=lambda x: setattr(patch.filt_env,"attack_time", x)),
+               setter=lambda x: setattr(patch.filt_env, "attack_time", x),
+               getter=lambda: getattr(patch.filt_env, "attack_time")
+               ),
     ParamRange("FiltRls", "filter release", 0.8, "%1.2f", 0.1, 5.0,
-               setter=lambda x: setattr(patch.filt_env,"release_time", x)),
+               setter=lambda x: setattr(patch.filt_env, "release_time", x),
+               getter=lambda: getattr(patch.filt_env, "release_time")
+               ),
 
+    # Pair 5
     ParamRange("FiltEnv", "filter env amount", 0, "%.2f", -0.99, 0.99,
-               setter=lambda x: setattr(patch, "filt_env_amount", x) ),
+               setter=lambda x: setattr(patch, "filt_env_amount", x),
+               #getter=lambda: getattr(patch, "filt_env_amount")
+               ),
     ParamChoice("FiltType", "filter type", 0, filter_types,
-                setter=lambda x: setattr(patch,"filt_type",filter_types[x])),
+                setter=lambda x: setattr(patch,"filt_type",filter_types[x]),
+                #getter=lambda: getattr(patch, "filt_type")
+                ),
     
+    # Pair 6
     ParamRange("Octave", "octave range", 0, "%d", -3, 2,
-               setter=lambda x: setattr(patch, "octave",int(x)) ),
+               setter=lambda x: setattr(patch, "octave", int(x)),
+               getter=lambda: getattr(patch, "octave")
+               ),
     ParamRange("Volume", "volume", 0.7, "%1.2f", 0.1, 1.0,
                setter=lambda x: hw.set_volume(x)),
+
 
 )
 
 def update_params():
     for p in params:
+        print("updating",p)
         p.update()
+        #print("updated ",p)
+
+update_params()
 
 knobA, knobB = hw.read_pots()  # returns 0-255 values
 synthui = SynthUI(hw.display, params, knobA, knobB)
+synthui.set_patch_name(patch.name)
 
 async def instrument_updater():
     while True:
@@ -141,6 +183,7 @@ async def midi_handler():
 
 
 async def ui_handler():
+    global patch
     notes_pressed = [None] * len(hw.touches)
     button_held = False
     button_with_touch = False
@@ -172,11 +215,15 @@ async def ui_handler():
                     if button_held:  # load a patch
                         button_with_touch = True
                         if touch.key_number == 15:  # make this be save key
+                            v = hw.get_volume()
+                            hw.set_volume(0)
                             save_patches(patches)
+                            hw.set_volume(v)
                         if touch.key_number < len(patches):
                             patchi = touch.key_number
                             patch = patches[patchi]
                             update_params()
+                            synthui.set_patch_name(patch.name)
                             inst.note_off_all()
                             inst.load_patch( patch )
                             print("loaded patch #",patchi)

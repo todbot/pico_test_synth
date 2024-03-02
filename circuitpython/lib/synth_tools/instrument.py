@@ -76,7 +76,7 @@ class PolyWaveSynth(Instrument):
         """Loads patch specifics from passed-in Patch object.
            ##### FIXME: no it doesnt: Will reload patch if patch is not specified. """
         self.patch = patch #  self.patch or patch
-        print("PolyTwoOsc.load_patch", patch)
+        #print("PolyWaveSynth.load_patch:", patch)
 
         self.synth.blocks.clear()   # remove any global LFOs
 
