@@ -1,21 +1,26 @@
-import os
-import time
-import synthio
-from collections import namedtuple
-from micropython import const
-import ulab.numpy as np
-try:
-    import adafruit_wave
-except:
-    print("synthio_instrment: no WAV import available")
+# SPDX-FileCopyrightText: Copyright (c) 2023 Tod Kurt
+# SPDX-License-Identifier: MIT
+"""
+`instrument`
+================================================================================
 
+An Instrument receives note on/off events to manage sound creation
+with `synthio`. `Instruemnt` uses a `Patch` and maybe a `Wavetable`
+to create the internal objects needed by `synthio`.
+
+Part of synth_tools.
+
+"""
+
+import synthio
 
 from synth_tools.patch import Patch, WaveType
 from synth_tools.waves import Waves, Wavetable, lerp
 
+
 class Instrument():
     """
-    Simple instrument to be used with synthio
+    Basic instrument that uses synthio
     """
     
     def __init__(self, synth, patch=None):
@@ -53,15 +58,9 @@ class Instrument():
             self.synth.release(voice)
             self.voices.pop(midi_note)  # FIXME: need to run filter after release cycle
 
-#
-# class MonoOsc(Instrument):
-#     def __init__(self, synth, patch):
-#         super().__init__(synth)
-#         self.load_patch(patch)
 
 
-#
-class WavePolyTwoOsc(Instrument):
+class PolyWaveSynth(Instrument):
     """
     This implementation of Instrument is a two-oscillator per voice
     subtractive synth with detunable oscillators,
@@ -202,3 +201,10 @@ class WavePolyTwoOsc(Instrument):
         """Update detune settings in realtime"""
         for (osc1,osc2,filt_env,amp_env) in self.voices.values():
             osc2.frequency = osc1.frequency * self.patch.detune
+
+
+#
+# class MonoOsc(Instrument):
+#     def __init__(self, synth, patch):
+#         super().__init__(synth)
+#         self.load_patch(patch)

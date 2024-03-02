@@ -1,3 +1,24 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 Tod Kurt
+# SPDX-License-Identifier: MIT
+"""
+`param_scaler`
+================================================================================
+
+`ParamScaler` attempts to solve the "knob pickup" problem when a control's
+position does not match the Param position.
+
+The scaler will increase/decrease its internal value relative to the change
+of the incoming knob position and the amount of "runway" remaining on the
+value. Once the knob reaches its max or min position, the value will
+move in sync with the knob.  The value will always decrease/increase
+in the same direction as the knob.
+This mirrors how the Deluge synth's "SCALE" mode works.
+
+Part of synth_tools.
+
+"""
+
+
 from micropython import const
 
 knob_min, knob_max = const(0), const(255) 
@@ -5,7 +26,7 @@ val_min, val_max = const(0), const(255)
 
 class ParamScaler:
     def __init__(self, val, knob_pos):
-        """ val and knob_pos range from 0-127, floating point """
+        """ val and knob_pos range from 0-255, floating point """
         self.val = val
         self.knob_pos_last = knob_pos
         self.reset(val,knob_pos)

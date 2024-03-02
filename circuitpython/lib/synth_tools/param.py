@@ -1,3 +1,20 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 Tod Kurt
+# SPDX-License-Identifier: MIT
+"""
+`param`
+================================================================================
+
+A `Param` is a named represention of an on-screen configuration value.
+
+A `ParamRange` is a Param with a numeric range and setter function to update
+when the Param is changed.
+
+A `ParamChoice` is a Param with a list of options to choose from and
+a setter function to update when the Param is changed.
+
+Part of synth_tools.
+
+"""
 
 
 class Param:

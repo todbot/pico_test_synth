@@ -6,9 +6,10 @@ import displayio, terminalio, vectorio
 from pico_test_synth.hardware import Hardware
 
 from synth_tools.patch import Patch
-from synth_tools.instrument import WavePolyTwoOsc
+from synth_tools.instrument import PolyWaveSynth
 from synth_tools.param import ParamRange, ParamChoice
 import synth_tools.winterbloom_smolmidi as smolmidi
+from synth_tools.patch_saver import load_patches, save_patches
 
 from synthui import SynthUI
 
@@ -27,29 +28,26 @@ hw.set_volume(0.7)
 midi_usb_in = smolmidi.MidiIn(usb_midi.ports[0])
 midi_uart_in = smolmidi.MidiIn(hw.midi_uart)
 
-# only using one patch for now, but let's pretend
-patch1 = Patch('oneuno')
-patch2 = Patch('twotoo')
+patches = load_patches()
+if not patches:
+    print("no patches, making up one")
+    patch1 = Patch('oneuno')
+    patch1.amp_env.attack_time = 0.01
+    patch1.amp_env.release_time = 0.3
+    patch1.filt_env.attack_time = 1.1
+    patch1.filt_env.release_time = 0.8
+    patch1.filt_f = 2345
+    patch1.filt_q = 1.7
+    patch1.waveB = 'SQU'
+    patch1.wave_mix_lfo_amount = 0.3
+    patch1.detune = 1.01
+    
+    patches = [patch1]
 
-patch1.amp_env.attack_time = 0.01
-patch1.amp_env.release_time = 0.3
-patch1.filt_env.attack_time = 1.1
-patch1.filt_env.release_time = 0.8
-patch1.filt_f = 2345
-patch1.filt_q = 1.7
-patch1.waveB = 'SQU'
-patch1.wave_mix_lfo_amount = 0.3
-patch1.detune = 1.01
+patch = patches[0]
+inst = PolyWaveSynth(hw.synth, patch)
 
-patch2.filt_type = "HP"
-patch2.wave = 'square'
-patch2.detune = 1.01
-patch2.filt_env.attack_time = 0.0  # turn off filter  FIXME
-patch2.amp_env.release_time = 1.0
-
-patch = patch1
-inst = WavePolyTwoOsc(hw.synth, patch)
-
+# some utilities for the Params below
 wave_selects = patch.generate_wave_selects()
 filter_types = patch.get_filter_types()
 
@@ -158,10 +156,8 @@ async def ui_handler():
                 
                 if touch.pressed:
                     if button_held:  # load a patch
-                        print("load patch", touch.key_number)
-                        # disable this for now
-                        # inst.load_patch(patches[i])
-                        # wavedisp.display_update()
+                        if touch.key_number == 15:  # make this be save key
+                            save_patches(patches)
                     else:  # trigger a note
                         midi_note = touch_midi_notes[touch.key_number]
                         midi_note += (inst.patch.octave*12)

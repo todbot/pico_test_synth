@@ -1,9 +1,17 @@
-# synthio_patch.py
-#
+# SPDX-FileCopyrightText: Copyright (c) 2023 Tod Kurt
+# SPDX-License-Identifier: MIT
+"""
+`patch`
+================================================================================
+
+Patch, a representation of a synthesizer settings, used by an `Instrument`.
+
+Part of synth_tools.
+
+"""
 
 import os
 import synthio
-
 
 class LFOParams:
     """
@@ -52,7 +60,7 @@ class WaveType:
 class Patch:
     """ Patch is a serializable data structure for the Instrument's settings
     """
-    def __init__(self, name, wave_type=WaveType.OSC, wave='SAW', detune=1.01,
+    def __init__(self, name='initpatch', wave_type=WaveType.OSC, wave='SAW', detune=1.01,
                  filt_type="LP", filt_f=8000, filt_q=1.2,
                  filt_env_params=None, amp_env_params=None):
         self.name = name

@@ -1,3 +1,15 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 Tod Kurt
+# SPDX-License-Identifier: MIT
+"""
+`gauge_cluster`
+================================================================================
+
+A group of `displayio` value displays that represent groups of values
+
+Part of synth_tools.
+
+"""
+
 import displayio
 import vectorio
 

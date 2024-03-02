@@ -1,3 +1,16 @@
+# SPDX-FileCopyrightText: Copyright (c) 2023 Tod Kurt
+# SPDX-License-Identifier: MIT
+"""
+`waves`
+================================================================================
+
+`Waves` is a set of waveform construction tools for `synthio`.
+`Wavetable` uses `Waves` to create a Wavetable waveform for `Instrument`
+that can load arbitrary two waveforms and mix between them.
+
+Part of synth_tools.
+
+"""
 
 # synthio_waves.py
 
