@@ -30,19 +30,20 @@ midi_uart_in = smolmidi.MidiIn(hw.midi_uart)
 
 patches = load_patches()
 if not patches:
-    print("no patches, making up one")
-    patch1 = Patch('oneuno')
-    patch1.amp_env.attack_time = 0.01
-    patch1.amp_env.release_time = 0.3
-    patch1.filt_env.attack_time = 1.1
-    patch1.filt_env.release_time = 0.8
-    patch1.filt_f = 2345
-    patch1.filt_q = 1.7
-    patch1.waveB = 'SQU'
-    patch1.wave_mix_lfo_amount = 0.3
-    patch1.detune = 1.01
+    print("no patches, making up some")
+    patch0 = Patch('oneuno')
+    patch0.amp_env.attack_time = 0.01
+    patch0.amp_env.release_time = 0.3
+    patch0.filt_env.attack_time = 1.1
+    patch0.filt_env.release_time = 0.8
+    patch0.filt_f = 2345
+    patch0.filt_q = 1.7
+    patch0.waveB = 'SQU'
+    patch0.wave_mix_lfo_amount = 0.3
+    patch0.detune = 1.01
     
-    patches = [patch1]
+    patches = [patch0, Patch('two'), Patch('three'), Patch('four'),
+               Patch('five'), Patch('six'), Patch('seven'),]
 
 patch = patches[0]
 inst = PolyWaveSynth(hw.synth, patch)
