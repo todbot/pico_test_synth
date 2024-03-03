@@ -15,6 +15,7 @@ from synthui import SynthUI, splash_screen
 
 # hit the turbo button!
 import microcontroller
+#microcontroller.cpu.frequency = 125_000_000  # normal speed
 microcontroller.cpu.frequency = 250_000_000
 
 
@@ -246,7 +247,7 @@ async def ui_handler():
                         midi_note = notes_pressed[touch.key_number]
                         inst.note_off(midi_note)
                         hw.set_led(0)
-        await asyncio.sleep(0.005)
+        await asyncio.sleep(0.01)
     
 
 print("--- pico_test_synth wavesynth ready ---")

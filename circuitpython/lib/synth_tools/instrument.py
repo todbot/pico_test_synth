@@ -68,6 +68,8 @@ class PolyWaveSynth(Instrument):
     Each oscillator can also be a customized wavetable with wavemixing
     between two different waveforms.
     """
+    wave_volume = 16000   # lower volume means less distortion on chords
+    
     def __init__(self, synth, patch):
         super().__init__(synth)
         self.load_patch(patch)
@@ -89,10 +91,10 @@ class PolyWaveSynth(Instrument):
         # standard two-osc oscillator patch
         if patch.wave_type == WaveType.OSC:
             self.waveform = Waves.make_waveform('silence')  # our working buffer, overwritten w/ wavemix
-            self.waveformA = Waves.make_waveform( patch.wave, volume=16000 )
+            self.waveformA = Waves.make_waveform( patch.wave, volume=PolyWaveSynth.wave_volume )
             self.waveformB = None
             if patch.waveB:
-                self.waveformB = Waves.make_waveform( patch.waveB, volume=16000 )
+                self.waveformB = Waves.make_waveform( patch.waveB, volume=PolyWaveSynth.wave_volume )
             else:
                 self.waveform = self.waveformA
 
@@ -100,8 +102,6 @@ class PolyWaveSynth(Instrument):
         elif patch.wave_type == WaveType.WTB:
             self.wavetable = Wavetable(patch.wave_dir+"/"+patch.wave+".WAV")
             self.waveform = self.wavetable.waveform
-
-        #self.filt_env_wave = Waves.lfo_triangle()  # FIXME
 
     def reload_patch(self):
         """Reload the set patch, turns off all notes"""
@@ -128,18 +128,19 @@ class PolyWaveSynth(Instrument):
         elif self.patch.filt_type == "BP":
             filt = self.synth.band_pass_filter( filt_f,filt_q )
         else:
-            print("unknown filt_type:", self.patch.filt_type)
+            pass  # no filter
             
-        #print("%s: %.1f %.1f %.1f %.1f"%(self.patch.filt_type,osc1.frequency,filt_f,self.patch.filt_f,filt_q))
         osc1.filter = filt
-        if self.patch.detune:
+        if osc2:
             osc2.filter = filt
-        
 
     def update(self):
         """Update filter envelope and wave-mixing, must be called frequently"""
         for (osc1,osc2,filt_env,amp_env) in self.voices.values():
 
+            # for each voice, update filter
+            self._update_filter(osc1,osc2,filt_env)
+            
             # let Wavetable do the work  # FIXME: don't need to do this per osc1 yeah?
             if self.patch.wave_type == WaveType.WTB:
                 self.wave_lfo.a.rate = self.patch.wave_mix_lfo_rate  # FIXME: danger
@@ -152,14 +153,10 @@ class PolyWaveSynth(Instrument):
                 if self.waveformB:
                     # FIXME: does not work yet
                     #wave_mix = self.patch.wave_mix + self.wave_lfo.a.rate * self.patch.wave_mix_lfo_amount * 2
-                    wave_mix = self.patch.wave_mix  # but this works
-                    osc1.waveform[:] = lerp(self.waveformA, self.waveformB, wave_mix) #self.patch.wave_mix)
-                    if self.patch.detune:
-                        osc2.waveform[:] = lerp(self.waveformA, self.waveformB, wave_mix) #self.patch.wave_mix)
-
-            # for each voice, update filter
-            self._update_filter(osc1,osc2,filt_env)
-            
+                    wave_mix = self.patch.wave_mix  # but at least this works
+                    osc1.waveform[:] = lerp(self.waveformA, self.waveformB, wave_mix) 
+                    if osc2:
+                        osc2.waveform[:] = lerp(self.waveformA, self.waveformB, wave_mix) 
 
     def note_on(self, midi_note, midi_vel=127):
         amp_env = self.patch.amp_env.make_env()
@@ -175,13 +172,15 @@ class PolyWaveSynth(Instrument):
 
         f = synthio.midi_to_hz(midi_note)
         osc1 = synthio.Note( frequency=f, waveform=self.waveform, envelope=amp_env )
+        #osc2 = None
+        #if self.patch.detune:
         osc2 = synthio.Note( frequency=f * self.patch.detune, waveform=self.waveform, envelope=amp_env )
         
-        self._update_filter(osc1, osc2, filt_env)
-        
         self.voices[midi_note] = (osc1, osc2, filt_env, amp_env)
+        self.update()  # update filter and wave before note press
         self.synth.press( (osc1,osc2) )
         self.synth.blocks.append(filt_env) # not tracked automaticallly by synthio
+
 
     def note_off(self, midi_note, midi_vel=0):
         (osc1,osc2,filt_env,amp_env) = self.voices.get(midi_note, (None,None,None,None)) # FIXME
