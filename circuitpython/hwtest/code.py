@@ -92,7 +92,8 @@ mixer.voice[0].play(synth)
 
 # set up the synth
 wave_saw = np.linspace(20000,-20000, num=512, dtype=np.int16)  # default squ is too clippy
-amp_env = synthio.Envelope(sustain_level=0.8, release_time=0.4, attack_time=0.001)
+#amp_env = synthio.Envelope(attack_level=1.0, sustain_level=1.0, release_time=0.4, attack_time=0.4, decay_time=0.5)
+amp_env = synthio.Envelope(release_time=0.3, attack_time=0.3)
 synth.envelope = amp_env
 
 # set up info to be displayed
@@ -103,6 +104,7 @@ text2 = label.Label(terminalio.FONT, text="@todbot", x=0, y=25)
 text3 = label.Label(terminalio.FONT, text="pico_test_synth!", x=0, y=50)
 for t in (text1, text2, text3):
     maingroup.append(t)
+time.sleep(1)
 
 touch_notes = [None] * len(midi_notes)
 sw_pressed = False
