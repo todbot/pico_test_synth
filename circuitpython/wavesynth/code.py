@@ -13,6 +13,7 @@ from synth_tools.patch_saver import load_patches, save_patches, copy
 
 from synthui import SynthUI
 
+# hit the turbo button!
 import microcontroller
 microcontroller.cpu.frequency = 250_000_000
 
@@ -22,7 +23,6 @@ touch_midi_notes = list(range(45, 45+16))  # notes touch keyboard sends FIXME
 
 print("hardware...")
 hw = Hardware()
-hw.set_volume(0.7)
 
 # let's get the midi going
 midi_usb_in = smolmidi.MidiIn(usb_midi.ports[0])
@@ -91,7 +91,7 @@ params = (
                 #getter=lambda: wave_selects.index(getattr(patch, "wave_select")()) ),
     
     # Pair 2
-    ParamRange("WavLFO", "wave lfo amount", 0.3, "%2.1f", 0.0, 10,
+    ParamRange("WavLFO", "wave lfo amount", 0.3, "%2.1f", 0.0, 5,
                setter=lambda x: setattr(patch, "wave_mix_lfo_amount", x),
                getter=lambda: getattr(patch, "wave_mix_lfo_amount")),
     ParamRange("WavRate", "wave lfo rate", 0.3, "%2.1f", 0.0, 5,
@@ -135,7 +135,7 @@ params = (
                getter=lambda: getattr(patch, "octave")
                ),
     ParamRange("Volume", "volume", 0.7, "%1.2f", 0.1, 1.0,
-               setter=lambda x: hw.set_volume(x)),
+               setter=lambda x: hw.set_volume(min(max(x,0),1))),
 
 
 )
@@ -155,7 +155,7 @@ synthui.set_patch_name(patch.name)
 async def instrument_updater():
     while True:
         inst.update()
-        await asyncio.sleep(0.01)  # as fast as possible
+        await asyncio.sleep(0.001)  # as fast as possible
         
 async def midi_handler():
     while True:

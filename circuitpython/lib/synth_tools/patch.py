@@ -94,7 +94,7 @@ class Patch:
         self.wave = wave
         self.waveB = 'TRI'
         self.wave_mix = 0.0  # 0 = wave, 1 = waveB
-        self.wave_mix_lfo_amount = 3  # FIXME: what is this range
+        self.wave_mix_lfo_amount = 1  # FIXME: what is this range
         self.wave_mix_lfo_rate = 0.5  # Hz
         self.wave_dir = '/wav'
         self.detune = detune
@@ -128,15 +128,3 @@ class Patch:
 
     
 
-# class FiltType:
-#     """ """
-#     LP = const(0)
-#     HP = const(1)
-#     BP = const(2)
-#     def str(t):
-#         if t==LP: return 'LP'
-#         elif t==HP: return 'HP'
-#         elif t==BP: return 'BP'
-#         return 'UN'
-
-    
