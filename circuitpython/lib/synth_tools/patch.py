@@ -101,7 +101,7 @@ class Patch:
         self.filt_type = filt_type   # allowed values:
         self.filt_f = filt_f
         self.filt_q = filt_q
-        self.filt_env_amount = 0
+        self.filt_env_amount = 0.3
         self.filt_env = filt_env_params or EnvParams()
         self.amp_env = amp_env_params or EnvParams()
         self.octave = 0

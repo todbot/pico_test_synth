@@ -11,18 +11,20 @@ from synth_tools.param import ParamRange, ParamChoice
 import synth_tools.winterbloom_smolmidi as smolmidi
 from synth_tools.patch_saver import load_patches, save_patches, copy
 
-from synthui import SynthUI
+from synthui import SynthUI, splash_screen
 
 # hit the turbo button!
 import microcontroller
 microcontroller.cpu.frequency = 250_000_000
 
-#time.sleep(2)  # let USB quiet down (when debugging)
 
 touch_midi_notes = list(range(45, 45+16))  # notes touch keyboard sends FIXME
 
 print("hardware...")
 hw = Hardware()
+splash_screen(hw.display)
+
+time.sleep(1)  # let USB quiet down (when debugging)
 
 # let's get the midi going
 midi_usb_in = smolmidi.MidiIn(usb_midi.ports[0])
@@ -155,7 +157,7 @@ synthui.set_patch_name(patch.name)
 async def instrument_updater():
     while True:
         inst.update()
-        await asyncio.sleep(0.001)  # as fast as possible
+        await asyncio.sleep(0.01)  # as fast as is reasonable
         
 async def midi_handler():
     while True:
@@ -179,7 +181,7 @@ async def midi_handler():
                 #     # inst.patch.wave_mix_lfo_rate = msg.value/127 * 5
                 # elif ccnum == 74:  # filter cutoff
                 #     inst.patch.filt_f = ccval/127 * 8000
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.01)
 
 
 async def ui_handler():

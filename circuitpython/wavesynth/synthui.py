@@ -5,6 +5,20 @@ from adafruit_display_text import bitmap_label as label
 from synth_tools.gauge_cluster import GaugeCluster
 from synth_tools.param_scaler import ParamScaler
 
+fnt = terminalio.FONT
+cw = 0xFFFFFF
+
+def splash_screen(display):
+    splash_group = displayio.Group()
+    splash_group.append(label.Label(fnt, text="pico_test_synth",
+                                    color=cw, x=1, y=10, scale=1))
+    splash_group.append(label.Label(fnt, text="wavesynth",
+                                    color=cw, x=1, y=30, scale=2))
+    splash_group.append(label.Label(fnt, text="@todbot",
+                                    color=cw, x=1, y=50, scale=1))
+    display.root_group = splash_group
+    display.refresh()
+
 
 class SynthUI(displayio.Group):
     def __init__(self, display, params, knobAval, knobBval):
@@ -16,8 +30,6 @@ class SynthUI(displayio.Group):
         self.cluster = GaugeCluster(self.num_params, x=1, y=13, width=6, height=20, xstride=2.3)
         self.append(self.cluster.gauges)
         self.append(self.cluster.select_lines)  # indicates which param set is editable
-        fnt = terminalio.FONT
-        cw = 0xFFFFFF
         
         # text of the currently editable parameters
         self.textA = label.Label(fnt, text="tA", color=cw, x=1, y=44, scale=2)

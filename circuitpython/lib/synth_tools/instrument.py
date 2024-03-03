@@ -111,7 +111,6 @@ class PolyWaveSynth(Instrument):
 
     def _update_filter(self, osc1, osc2, filt_env):
         # prevent filter instability around note frequency
-        # must do this for each voice
         #if self.patch.filt_f / osc1.frequency < 1.2:  filt_q = filt_q / 2
         #filt_f = max(self.patch.filt_f * filt_env.value, osc1.frequency*0.75) # filter unstable <oscfreq?
         #filt_f = max(self.patch.filt_f * filt_env.value, 0) # filter unstable <100?
@@ -153,11 +152,12 @@ class PolyWaveSynth(Instrument):
                 if self.waveformB:
                     # FIXME: does not work yet
                     #wave_mix = self.patch.wave_mix + self.wave_lfo.a.rate * self.patch.wave_mix_lfo_amount * 2
-                    wave_mix = self.patch.wave_mix
+                    wave_mix = self.patch.wave_mix  # but this works
                     osc1.waveform[:] = lerp(self.waveformA, self.waveformB, wave_mix) #self.patch.wave_mix)
                     if self.patch.detune:
                         osc2.waveform[:] = lerp(self.waveformA, self.waveformB, wave_mix) #self.patch.wave_mix)
 
+            # for each voice, update filter
             self._update_filter(osc1,osc2,filt_env)
             
 
@@ -169,6 +169,7 @@ class PolyWaveSynth(Instrument):
         filt_env_time = (self.patch.filt_env.attack_time  +
                          self.patch.filt_env.release_time)
         filt_env_rate = 1 / filt_env_time  # guaranteed to never be zero
+        # use an LFO to fake an Envelope since we can't get envelope.value
         filt_env = synthio.LFO(once=True, scale=0.9, offset=1.01, # fixme: make always positve
                                waveform=filt_env_wave, rate=filt_env_rate ) 
 
