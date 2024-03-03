@@ -13,7 +13,7 @@ class SynthUI(displayio.Group):
         self.params = params
         self.num_params = len(params)
         
-        self.cluster = GaugeCluster(self.num_params, x=1, y=3, width=6, height=20, xstride=2.3)
+        self.cluster = GaugeCluster(self.num_params, x=1, y=13, width=6, height=20, xstride=2.3)
         self.append(self.cluster.gauges)
         self.append(self.cluster.select_lines)  # indicates which param set is editable
         fnt = terminalio.FONT
@@ -31,11 +31,8 @@ class SynthUI(displayio.Group):
             self.append(l)
 
         # text for patch info
-        self.labelP = label.Label(fnt, text="patch:patchname", color=cw, x=20, y=28, scale=1)
+        self.labelP = label.Label(fnt, text="patch:patchname", color=cw, x=20, y=4, scale=1)
         self.append(self.labelP)
-
-        for i in range(self.num_params):
-            self.cluster.set_gauge_val(i, int(self.params[i].get_by_gauge_val()))
 
         self.scalerA = ParamScaler(self.params[0].get_by_gauge_val(), knobAval)
         self.scalerB = ParamScaler(self.params[1].get_by_gauge_val(), knobBval)
@@ -45,6 +42,7 @@ class SynthUI(displayio.Group):
         self.lastA = knobAval
         self.lastB = knobBval
         self.knobMin = 1
+        self.refresh_gauge_cluster()
 
     def set_patch_name(self,pname):
         self.labelP.text="patch:"+pname        
@@ -57,8 +55,15 @@ class SynthUI(displayio.Group):
             self.textB.x = 128 - w//2
         else:
             self.textB.x = 128 - w
+
+    def refresh_gauge_cluster(self):
+        """Set the gauge values to what the params are"""
+        for i in range(self.num_params):
+            self.cluster.set_gauge_val(i, int(self.params[i].get_by_gauge_val()))
+        self.select_pair(self.pairnum)  # causes redraw of param text
         
     def select_pair(self,p):
+        """Select a given pair of params to edit"""
         self.cluster.select_line(self.pairnum, False)  # deselect old
         self.pairnum = p
         self.cluster.select_line(self.pairnum)  # select new

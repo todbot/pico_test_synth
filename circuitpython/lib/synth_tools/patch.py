@@ -87,7 +87,7 @@ class Patch:
     """ Patch is a serializable data structure for the Instrument's settings
     """
     def __init__(self, name='initpatch', wave_type=WaveType.OSC, wave='SAW', detune=1.01,
-                 filt_type="LP", filt_f=8000, filt_q=1.2,
+                 filt_type="LP", filt_f=4000, filt_q=0.7,
                  filt_env_params=None, amp_env_params=None):
         self.name = name
         self.wave_type = wave_type  # or 'osc' or 'wav' or 'wtb'

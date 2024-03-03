@@ -65,7 +65,7 @@ def get_wave_select_idx():
         print("patch:'%s' wave_select '%s' not in wave_selects" % (patch.name, wave_select))
         wave_select = Patch.wave_selects[0]
         patch.set_by_wave_select(wave_select)
-        print("patch: wave_select new:",patch.wave_select())
+        print("patch: new wave_select:",patch.wave_select())
     idx = Patch.wave_selects.index(wave_select)
     print("get_wave_select_idx:",idx)
     return idx
@@ -142,7 +142,7 @@ params = (
 
 def update_params():
     for p in params:
-        print("updating",p)
+        #print("updating",p)
         p.update()
         #print("updated ",p)
 
@@ -224,6 +224,7 @@ async def ui_handler():
                             patch = patches[patchi]
                             update_params()
                             synthui.set_patch_name(patch.name)
+                            synthui.refresh_gauge_cluster()
                             inst.note_off_all()
                             inst.load_patch( patch )
                             print("loaded patch #",patchi)

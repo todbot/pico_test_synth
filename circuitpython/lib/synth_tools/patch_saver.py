@@ -93,7 +93,7 @@ def load_patches(fname=patches_save_fname):
             print("load_patches: done")
             return patches
     except Exception as e:
-        print("load_patches: could not load, no patch file", fname, e)
+        print("load_patches: could not load", fname, "error:",e)
     return None  # if badness
 
 def save_patches(patches, fname=patches_save_fname):
