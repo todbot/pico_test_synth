@@ -183,10 +183,10 @@ async def midi_handler():
     while True:
         while msg := midi_usb_in.receive() or midi_uart_in.receive():
             if msg.type == smolmidi.NOTE_ON:
-                inst.note_on(msg.data[0])
+                inst.note_on(msg.data[0], msg.data[1])
                 hw.set_led(0xff00ff)
             elif msg.type == smolmidi.NOTE_OFF:
-                inst.note_off(msg.data[0])
+                inst.note_off(msg.data[0], msg.data[1])
                 hw.set_led(0x000000)
             elif msg.type == smolmidi.CC:
                 ccnum = msg.data[0]

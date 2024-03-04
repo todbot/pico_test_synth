@@ -162,7 +162,13 @@ class PolyWaveSynth(Instrument):
                         osc2.waveform[:] = lerp(self.waveformA, self.waveformB, wave_mix) 
 
     def note_on(self, midi_note, midi_vel=127):
-        amp_env = self.patch.amp_env.make_env()
+        #amp_env = self.patch.amp_env.make_env()
+        lvl = 0.5 + (midi_vel/127/2)
+        amp_env = synthio.Envelope(attack_time = self.patch.amp_env.attack_time,
+                                   decay_time = self.patch.amp_env.decay_time,
+                                   release_time = self.patch.amp_env.release_time,
+                                   attack_level = lvl,
+                                   sustain_level = lvl)
 
         filt_env_wave = Waves.from_ar_times( self.patch.filt_env.attack_time,
                                              self.patch.filt_env.release_time )
