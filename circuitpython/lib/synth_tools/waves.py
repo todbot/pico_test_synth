@@ -30,8 +30,9 @@ def lerp(a, b, t):  return (1-t)*a + t*b
 class Waves:
     """
     Generate waveforms for either oscillator or LFO use
+    By default, audio waveforms are half-amplitude (+/- 16383)
     """
-    def make_waveform(waveid, size=512, volume=30000):
+    def make_waveform(waveid, size=512, volume=32767//2):
         waveid = waveid.upper()
         if waveid=='SIN' or waveid=='SINE':
             return Waves.sine(size,volume)
@@ -72,7 +73,7 @@ class Waves:
         return np.zeros(size, dtype=np.int16)
 
     def noise(size,volume):
-        return np.array([random.randint(-32767, 32767) for i in range(size)], dtype=np.int16)
+        return np.array([random.randint(-volume, volume) for i in range(size)], dtype=np.int16)
 
     def from_list( vals ):
         #print("Waves.from_list: vals=",vals)
@@ -131,6 +132,11 @@ class Wavetable:
     In this implementation, you select a wave position (wave_pos) that can be
     fractional, and the fractional part allows for mixing of the waves
     at wave_pos and wave_pos+1.
+
+    Note: each waveform (either basic or wavetable) has a max amplitude
+    of +/-16383 instead of +/-32767 to provide from summing headroom
+    when doing multiple voices (synthio tries to do this, but I still
+    experience clipping)
     """
 
     def __init__(self, filepath, size=256, in_memory=False):
@@ -180,7 +186,8 @@ class Wavetable:
         # fractional position between a wave A & B
         wave_pos_frac = wave_pos - int(wave_pos)
         # mix waveforms A & B and copy result into waveform used by synthio
-        self.waveform[:] = lerp(self.waveformA, self.waveformB, wave_pos_frac)
+        # and reduce volume of wavetable by 2 so multi-voice doesn't distort as much
+        self.waveform[:] = lerp(self.waveformA, self.waveformB, wave_pos_frac) // 2
 
     def deinit(self):
         self.w.close()

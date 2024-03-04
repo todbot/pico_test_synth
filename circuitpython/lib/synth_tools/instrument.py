@@ -67,8 +67,12 @@ class PolyWaveSynth(Instrument):
     with configurable filter w/ filter envelope and an amplitude envelope.
     Each oscillator can also be a customized wavetable with wavemixing
     between two different waveforms.
+    
+    Note: each waveform (either basic or wavetable) has a max amplitude
+    of +/-16383 instead of +/-32767 to provide from summing headroom
+    when doing multiple voices (synthio tries to do this, but I still
+    experience clipping)
     """
-    wave_volume = 16000   # lower volume means less distortion on chords
     
     def __init__(self, synth, patch):
         super().__init__(synth)
@@ -82,7 +86,6 @@ class PolyWaveSynth(Instrument):
 
         self.synth.blocks.clear()   # remove any global LFOs
 
-        #raw_lfo1 = synthio.LFO(rate = 0.3)  #, scale=0.5, offset=0.5)  # FIXME: set lfo rate by patch param
         raw_lfo1 = synthio.LFO(rate = self.patch.wave_mix_lfo_rate) 
         lfo1 = synthio.Math( synthio.MathOperation.SCALE_OFFSET, raw_lfo1, 0.5, 0.5) # unipolar
         self.wave_lfo = lfo1
@@ -91,10 +94,10 @@ class PolyWaveSynth(Instrument):
         # standard two-osc oscillator patch
         if patch.wave_type == WaveType.OSC:
             self.waveform = Waves.make_waveform('silence')  # our working buffer, overwritten w/ wavemix
-            self.waveformA = Waves.make_waveform( patch.wave, volume=PolyWaveSynth.wave_volume )
+            self.waveformA = Waves.make_waveform(patch.wave)
             self.waveformB = None
             if patch.waveB:
-                self.waveformB = Waves.make_waveform( patch.waveB, volume=PolyWaveSynth.wave_volume )
+                self.waveformB = Waves.make_waveform(patch.waveB)
             else:
                 self.waveform = self.waveformA
 
@@ -172,8 +175,8 @@ class PolyWaveSynth(Instrument):
 
         f = synthio.midi_to_hz(midi_note)
         osc1 = synthio.Note( frequency=f, waveform=self.waveform, envelope=amp_env )
-        #osc2 = None
-        #if self.patch.detune:
+        ##osc2 = None
+        ##if self.patch.detune:
         osc2 = synthio.Note( frequency=f * self.patch.detune, waveform=self.waveform, envelope=amp_env )
         
         self.voices[midi_note] = (osc1, osc2, filt_env, amp_env)
