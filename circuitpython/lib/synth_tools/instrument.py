@@ -1,3 +1,4 @@
+## pylint: disable=invalid-name
 # SPDX-FileCopyrightText: Copyright (c) 2023 Tod Kurt
 # SPDX-License-Identifier: MIT
 """
@@ -22,7 +23,7 @@ class Instrument():
     """
     Basic instrument that uses synthio
     """
-    
+
     def __init__(self, synth, patch=None):
         self.synth = synth
         self.patch = patch or Patch('init')
@@ -39,24 +40,24 @@ class Instrument():
         for v in self.voices:
             print("note:",v)
 
-    def note_on(self, midi_note, midi_vel=127):
+    def note_on(self, midi_note, midi_vel=127):  # pylint: disable=unused-argument
         """
         Turn on a synthesizer note, using standard MIDI note & velocity values.
         Currently playing notes are kept track of internally.
         """
-        # FIXME: deal with multiple note_ons of same note
+        # TODFIXME: deal with multiple note_ons of same note
         f = synthio.midi_to_hz(midi_note)
         amp_env = self.patch.amp_env_params.make_env()
         voice = synthio.Note( frequency=f, envelope=amp_env )
         self.voices[midi_note] = voice
         self.synth.press( voice )
 
-    def note_off(self, midi_note, midi_vel=0):
+    def note_off(self, midi_note, midi_vel=0):  # pylint: disable=unused-argument
         """Turn off a synthesizer note, using stadnard MIDI note & velocity values."""
         voice = self.voices.get(midi_note, None)
         if voice:
             self.synth.release(voice)
-            self.voices.pop(midi_note)  # FIXME: need to run filter after release cycle
+            self.voices.pop(midi_note)  # TODFIXME: need to run filter after release cycle
 
 
 
@@ -73,7 +74,7 @@ class PolyWaveSynth(Instrument):
     when doing multiple voices (synthio tries to do this, but I still
     experience clipping)
     """
-    
+
     def __init__(self, synth, patch):
         super().__init__(synth)
         self.load_patch(patch)
@@ -86,14 +87,15 @@ class PolyWaveSynth(Instrument):
 
         self.synth.blocks.clear()   # remove any global LFOs
 
-        raw_lfo1 = synthio.LFO(rate = self.patch.wave_mix_lfo_rate) 
+        raw_lfo1 = synthio.LFO(rate = self.patch.wave_mix_lfo_rate)
         lfo1 = synthio.Math( synthio.MathOperation.SCALE_OFFSET, raw_lfo1, 0.5, 0.5) # unipolar
         self.wave_lfo = lfo1
         self.synth.blocks.append(lfo1)  # global lfo for wave_lfo
 
         # standard two-osc oscillator patch
         if patch.wave_type == WaveType.OSC:
-            self.waveform = Waves.make_waveform('silence')  # our working buffer, overwritten w/ wavemix
+            # self.waveform is our working buffer, overwritten w/ wavemix
+            self.waveform = Waves.make_waveform('silence')
             self.waveformA = Waves.make_waveform(patch.wave)
             self.waveformB = None
             if patch.waveB:
@@ -114,12 +116,13 @@ class PolyWaveSynth(Instrument):
 
     def _update_filter(self, osc1, osc2, filt_env):
         # prevent filter instability around note frequency
+        # filter unstable <oscfreq?
         #if self.patch.filt_f / osc1.frequency < 1.2:  filt_q = filt_q / 2
-        #filt_f = max(self.patch.filt_f * filt_env.value, osc1.frequency*0.75) # filter unstable <oscfreq?
-        #filt_f = max(self.patch.filt_f * filt_env.value, 0) # filter unstable <100?
-        
+        #filt_f = max(self.patch.filt_f * filt_env.value, osc1.frequency*0.75)
+        #filt_f = max(self.patch.filt_f * filt_env.value, 0)
+
         filt_amount = self.patch.filt_env_amount
-        filt_fmax = 8000   # FIXME: put this and a filt_fmin somewhere (instrument?)
+        filt_fmax = 8000   # TODFIXME: put this & filt_fmin somewhere (instrument?)
         filt_mod = filt_amount * filt_fmax * (filt_env.value/2)  # 8k/2 = max freq
         filt_f = min(max(self.patch.filt_f + filt_mod, 60), 8000)
         filt_q = self.patch.filt_q
@@ -132,37 +135,40 @@ class PolyWaveSynth(Instrument):
             filt = self.synth.band_pass_filter( filt_f,filt_q )
         else:
             pass  # no filter
-            
+
         osc1.filter = filt
         if osc2:
             osc2.filter = filt
 
     def update(self):
         """Update filter envelope and wave-mixing, must be called frequently"""
-        for (osc1,osc2,filt_env,amp_env) in self.voices.values():
+        p = self.patch
+        for (osc1,osc2,filt_env) in self.voices.values():
 
             # for each voice, update filter
             self._update_filter(osc1,osc2,filt_env)
-            
-            # let Wavetable do the work  # FIXME: don't need to do this per osc1 yeah?
-            if self.patch.wave_type == WaveType.WTB:
-                self.wave_lfo.a.rate = self.patch.wave_mix_lfo_rate  # FIXME: danger
-                wave_pos = self.wave_lfo.value * self.patch.wave_mix_lfo_amount * 10  # FIXME what is this range
-                wave_pos += self.patch.wave_mix * self.wavetable.num_waves
-                self.wavetable.set_wave_pos( wave_pos )
 
-            # else simple osc wave mixing
+            # if wavetable, wave_mix is normalized wave pos in wavetable
+            if p.wave_type == WaveType.WTB:
+                self.wave_lfo.a.rate = p.wave_mix_lfo_rate  # TODFIXME: danger
+                # TODFIXME what is wave_mix_lfo_amount range
+                wave_pos = self.wave_lfo.value * p.wave_mix_lfo_amount * 10
+                wave_pos += p.wave_mix * self.wavetable.num_waves
+                self.wavetable.set_wave_pos(wave_pos)
+
+            # else simple osc wave mixing between two waveforms
             else:
                 if self.waveformB:
-                    # FIXME: does not work yet
-                    #wave_mix = self.patch.wave_mix + self.wave_lfo.a.rate * self.patch.wave_mix_lfo_amount * 2
+                    # TODFIXME: does not work yet
+                    #wave_mix = self.patch.wave_mix + self.wave_lfo.a.rate
+                    #  * self.patch.wave_mix_lfo_amount * 2
                     wave_mix = self.patch.wave_mix  # but at least this works
-                    osc1.waveform[:] = lerp(self.waveformA, self.waveformB, wave_mix) 
+                    osc1.waveform[:] = lerp(self.waveformA, self.waveformB, wave_mix)
                     if osc2:
-                        osc2.waveform[:] = lerp(self.waveformA, self.waveformB, wave_mix) 
+                        osc2.waveform[:] = lerp(self.waveformA, self.waveformB, wave_mix)
 
     def note_on(self, midi_note, midi_vel=127):
-        #amp_env = self.patch.amp_env.make_env()
+        # amp_env = self.patch.amp_env.make_env()
         lvl = 0.5 + (midi_vel/127/2)
         amp_env = synthio.Envelope(attack_time = self.patch.amp_env.attack_time,
                                    decay_time = self.patch.amp_env.decay_time,
@@ -176,41 +182,45 @@ class PolyWaveSynth(Instrument):
                          self.patch.filt_env.release_time)
         filt_env_rate = 1 / filt_env_time  # guaranteed to never be zero
         # use an LFO to fake an Envelope since we can't get envelope.value
-        filt_env = synthio.LFO(once=True, scale=0.9, offset=1.01, # fixme: make always positve
-                               waveform=filt_env_wave, rate=filt_env_rate ) 
+        # TODFIXME:: make always positve
+        filt_env = synthio.LFO(once=True, scale=0.9, offset=1.01,
+                               waveform=filt_env_wave, rate=filt_env_rate)
 
         f = synthio.midi_to_hz(midi_note)
         osc1 = synthio.Note( frequency=f, waveform=self.waveform, envelope=amp_env )
-        ##osc2 = None
-        ##if self.patch.detune:
-        osc2 = synthio.Note( frequency=f * self.patch.detune, waveform=self.waveform, envelope=amp_env )
-        
-        self.voices[midi_note] = (osc1, osc2, filt_env, amp_env)
+        ## osc2 = None
+        ## if self.patch.detune:
+        osc2 = synthio.Note(frequency=f * self.patch.detune,
+                            waveform=self.waveform,
+                            envelope=amp_env)
+
+        self.voices[midi_note] = (osc1, osc2, filt_env)
         self.update()  # update filter and wave before note press
         self.synth.press( (osc1,osc2) )
         self.synth.blocks.append(filt_env) # not tracked automaticallly by synthio
 
 
     def note_off(self, midi_note, midi_vel=0):
-        (osc1,osc2,filt_env,amp_env) = self.voices.get(midi_note, (None,None,None,None)) # FIXME
+        (osc1,osc2,filt_env) = self.voices.get(midi_note, (None,None,None))
         #print("note_off:",osc1)
         if osc1:  # why this check? in case user tries to note_off a non-existant note
-            self.synth.release( (osc1,osc2) )
-            self.voices.pop(midi_note)  # FIXME: let filter run on release, check amp_env?
-            self.synth.blocks.remove(filt_env)  # FIXME: figure out how to release after note is done
+            self.synth.release((osc1,osc2))
+            # TODFIXME: let filter run on release, check amp_env?
+            self.voices.pop(midi_note)
+            # TODFIXME: figure out how to release after note is done
+            self.synth.blocks.remove(filt_env)
         #print("note_off: blocks:", self.synth.blocks)
 
     def note_off_all(self):
         """Turn off all currently playing notes"""
-        for n in self.voices.keys():
+        for n in self.voices:
             print("note_off_all:",n)
             self.note_off(n)
 
     def redetune(self):
         """Update detune settings in realtime"""
-        for (osc1,osc2,filt_env,amp_env) in self.voices.values():
+        for (osc1,osc2,*_) in self.voices.values():
             osc2.frequency = osc1.frequency * self.patch.detune
-
 
 #
 # class MonoOsc(Instrument):

@@ -32,20 +32,23 @@ midi_usb_in = smolmidi.MidiIn(usb_midi.ports[0])
 midi_uart_in = smolmidi.MidiIn(hw.midi_uart)
 
 patches = load_patches()
+print("loaded ", len(patches), "patches")
 if not patches:
     print("no patches, making up some")
-    patch0 = Patch('oneuno')
-    patch0.amp_env.attack_time = 0.01
-    patch0.amp_env.release_time = 0.5
-    patch0.filt_env.attack_time = 1.1
-    patch0.filt_env.release_time = 0.8
-    patch0.filt_f = 2345
-    patch0.filt_q = 1.7
-    patch0.waveB = 'SQU'
-    patch0.wave_mix_lfo_amount = 0.3
-    patch0.detune = 1.01
-    patches = [patch0, Patch('two'), Patch('three'), Patch('four'),
-               Patch('five'), Patch('six'), Patch('seven'),]
+    patch1 = Patch('one')
+    patch1.amp_env.attack_time = 0.01
+    patch1.amp_env.release_time = 0.5
+    patch1.filt_env.attack_time = 1.1
+    patch1.filt_env.release_time = 0.8
+    patch1.filt_f = 2345
+    patch1.filt_q = 1.7
+    patch1.waveB = 'SQU'
+    patch1.wave_mix_lfo_amount = 0.3
+    patch1.detune = 1.01
+    patches = [patch1, Patch('two'), Patch('three'), Patch('four'),
+               Patch('five'), Patch('six'), Patch('seven'),
+               Patch('eight'), Patch('nine')]
+key_number_to_patch = (1, 0, 2, 0, 3, 4, 0, 5, 0, 6, 0, 7, 8, 0, 9, 0)
 
 patch = patches[0]
 inst = PolyWaveSynth(hw.synth, patch)
@@ -68,7 +71,7 @@ def get_wave_select_idx():
         patch.set_by_wave_select(wave_select)
         print("patch: new wave_select:",patch.wave_select())
     idx = Patch.wave_selects.index(wave_select)
-    print("get_wave_select_idx:",idx)
+    #print("get_wave_select_idx:",idx)
     return idx
 
 # set of parameter pairs adjustable by the user
@@ -235,13 +238,14 @@ async def ui_handler():
                 if touch.pressed:
                     if button_held:  # load a patch
                         button_with_touch = True
+                        patchidx = key_number_to_patch[touch.key_number]
+                        print("key:", touch.key_number, "patch:", patchidx)
                         if touch.key_number == 15:  # make this be save key
                             # Save!
                             save_patches_action()
-                        if touch.key_number < len(patches):
+                        elif patchidx > 0:
                             # Load!
-                            patchidx = touch.key_number
-                            load_patches_action(patchidx)
+                            load_patches_action(patchidx-1)
                             
                     else:  # trigger a note
                         button_with_touch = False
