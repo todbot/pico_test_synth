@@ -7,6 +7,7 @@ synth to experiment with [`synthio`](https://github.com/todbot/circuitpython-syn
 <img src="./docs/pico_test_synth2.jpg" width=500>
 
 **video demo**
+
 [![video demo](https://img.youtube.com/vi/9U2Dn7ckdbs/0.jpg)](https://www.youtube.com/watch?v=9U2Dn7ckdbs)
 
 
