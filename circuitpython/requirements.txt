@@ -3,3 +3,5 @@ adafruit_wave
 adafruit_debouncer
 adafruit_displayio_ssd1306
 adafruit_display_text
+lib/pico_test_synth
+lib/synth_tools
