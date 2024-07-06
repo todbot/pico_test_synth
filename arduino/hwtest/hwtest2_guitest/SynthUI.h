@@ -41,8 +41,8 @@ public:
   }
 
 
-  void print_text(int x, int y, const char* str, const GFXfont *fnt = NULL) {
-    if(fnt!=NULL) { display->setFont(fnt); } 
+  void print_text(int x, int y, const char* str, const GFXfont* fnt = NULL) {
+    if (fnt != NULL) { display->setFont(fnt); }
     display->setTextColor(WHITE, 0);
     display->setCursor(x, y);
     display->print(str);
@@ -52,10 +52,21 @@ public:
    * Draw vertical slider with a "thumb" position identifying value
    * thumpos ranges 0.0-1.0
    */
-  void draw_vertical_slider(int x, int y, float thumbpos, int w = 5, int h = 63, int thumbw = 5, int thumbh = 10) {
+  void draw_vertical_slider(int x, int y, float thumbpos, int w = 5, int h = 63, int thumbw = 0, int thumbh = 10) {
     int ypos = thumbpos * h;
+    thumbw = (thumbw==0) ? w : thumbw;   // make thumbw same width as slider if not specified
     display->drawRect(x, y, w, h, WHITE);                   // right side scroll bar
     display->fillRect(x, y + ypos, thumbw, thumbh, WHITE);  // FIXME
+  }
+  /** 
+   * Draw horizontal slider with a "thumb" position identifying value
+   * thumpos ranges 0.0-1.0
+   */
+  void draw_horizontal_slider(int x, int y, float thumbpos, int w = 127, int h = 5, int thumbw = 10, int thumbh = 0) {
+    int xpos = thumbpos * (w - thumbw);
+    thumbh = (thumbh==0) ? h : thumbh;  // make thumbh same height as slider if not specified
+    display->drawRect(x, y - h, w, h, WHITE);                   // right side scroll bar
+    display->fillRect(x + xpos, y - h, thumbw, thumbh, WHITE);  // FIXME
   }
 
 

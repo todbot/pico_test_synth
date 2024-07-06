@@ -120,32 +120,12 @@ void updateInputs() {
   }
 }
 
-
-/** 
- * Draw vertical slider with a "thumb" position identifying value
- * thumpos ranges 0.0-1.0
- */
-void draw_vertical_slider(int x, int y, float thumbpos, int w=5, int h=63, int thumbw=5, int thumbh=10 ) { 
-  int ypos = thumbpos * h;
-  display.drawRect( x, y, w, h, WHITE ); // right side scroll bar
-  display.fillRect( x, y + ypos, thumbw, thumbh, WHITE ); // FIXME
-}
-/** 
- * Draw horizontal slider with a "thumb" position identifying value
- * thumpos ranges 0.0-1.0
- */
-void draw_horizontal_slider(int x, int y, float thumbpos, int w=127, int h=5, int thumbw=10, int thumbh=5) { 
-  int xpos = thumbpos * (w-thumbw);
-  display.drawRect( x, y-h, w, h, WHITE ); // right side scroll bar
-  display.fillRect( x+xpos, y-h, thumbw, thumbh, WHITE ); // FIXME
-}
-
 /**
  *
  */
 void updateDisplay() {
   // delay(50);
-  char buf[20];
+  char buf1[20], buf2[20];
   float xpos, ypos;
   int hp = hilite_param + param_offset;
  
@@ -164,23 +144,19 @@ void updateDisplay() {
   display.setFont(&myfont);
   display.setTextColor(WHITE, 0);
   
-  draw_vertical_slider( 122, 0, (float)param_offset / (num_params-num_disp_params+1));
+  synthui.draw_vertical_slider( 122, 0, (float)param_offset / (num_params-num_disp_params+1));
 
   for (int i = 0; i < num_disp_params; i++) {
-    display.setFont( i==hilite_param ? &myfontB : &myfont);
+    //display.setFont( );
     int io = i + param_offset;
     int loff = line_offset + i * line_spacing;
     if (io < num_params) {
-      snprintf(buf, 20, "%s", params[io].name);
-      display.setCursor(5, loff); // param name
-      display.print(buf);
-      display.setFont(&myfontSM);
-      snprintf(buf, 20, params[io].fmt, params[io].val);  // param value
-      // display.setFont( i==hilite_param ? &myfontB : &myfont);
-      display.setCursor(45, loff);
-      display.print(": ");
-      display.print(buf);
-      draw_horizontal_slider( 80, loff, params[io].percent(), 30, 5 );
+      snprintf(buf1, 20, "%s", params[io].name);
+      snprintf(buf2, 20, params[io].fmt, params[io].val);  // param value
+      synthui.print_text(5, loff, buf1, i==hilite_param ? &myfontB : &myfont);
+      synthui.print_text(45, loff, ":", &myfontSM);
+      synthui.print_text(50, loff, buf2);
+      synthui.draw_horizontal_slider( 80, loff, params[io].percent(), 35, 7,7 );
     }
   }
   
