@@ -9,7 +9,7 @@
  **/
 
 // set DEBUG_MIDI 1 to show CCs received in Serial Monitor
-#define DEBUG_MIDI 1
+#define DEBUG_MIDI 0
 
 #include <Adafruit_TinyUSB.h>
 #include <MIDI.h>
@@ -25,8 +25,8 @@
 #define OSCIL_DITHER_PHASE 1 
 // Mozzi's controller update rate, seems to have issues at 1024
 // If slower than 512 can't get all MIDI from Live
-//#define MOZZI_CONTROL_RATE 512 
-#define MOZZI_CONTROL_RATE 128 // mozzi rate for updateControl()
+#define MOZZI_CONTROL_RATE 512 
+// #define MOZZI_CONTROL_RATE 128 // mozzi rate for updateControl()
 
 #include <Mozzi.h>
 
@@ -106,13 +106,13 @@ typedef struct {
 //MIDI_CREATE_DEFAULT_INSTANCE();
 
 //
-Oscil<SAW_ANALOGUE512_NUM_CELLS, AUDIO_RATE> aOsc1(SAW_ANALOGUE512_DATA);
-Oscil<SAW_ANALOGUE512_NUM_CELLS, AUDIO_RATE> aOsc2(SAW_ANALOGUE512_DATA);
+Oscil<SAW_ANALOGUE512_NUM_CELLS, MOZZI_AUDIO_RATE> aOsc1(SAW_ANALOGUE512_DATA);
+Oscil<SAW_ANALOGUE512_NUM_CELLS, MOZZI_AUDIO_RATE> aOsc2(SAW_ANALOGUE512_DATA);
 
-Oscil<COS2048_NUM_CELLS, CONTROL_RATE> kFilterMod(COS2048_DATA); // filter mod
+Oscil<COS2048_NUM_CELLS, MOZZI_CONTROL_RATE> kFilterMod(COS2048_DATA); // filter mod
 
-ADSR <CONTROL_RATE, AUDIO_RATE> envelope;
-Portamento <CONTROL_RATE> portamento;
+ADSR <CONTROL_RATE, MOZZI_AUDIO_RATE> envelope;
+Portamento <MOZZI_CONTROL_RATE> portamento;
 LowPassFilter lpf;
 
 //
@@ -122,11 +122,11 @@ void setup() {
   // Serial1.setRX(uart_rx_pin);
   // Serial1.setTX(uart_tx_pin);
 
+  Serial.begin(115200);
   MIDIusb.begin(MIDI_CHANNEL_OMNI);
   MIDIusb.turnThruOff();   // turn off echo
   // MIDIuart.begin(MIDI_CHANNEL_OMNI); // don't forget OMNI
   // MIDIuart.turnThruOff();  // turn off echo
-  Serial.begin(115200);
 
   startMozzi(MOZZI_CONTROL_RATE);
 

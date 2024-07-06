@@ -7,25 +7,26 @@
 #include <TouchyTouch.h>
 #include <Smooth.h>
 
-const int sw_pin = 28;
-const int knobB_pin = 27;
-const int knobA_pin = 26;
-const int led_pin = 25;       // regular LED, not neopixel
-const int pico_pwr_pin = 23;  // HIGH = improved ripple (lower noise) but less efficient
-const int i2s_data_pin = 22;
-const int i2s_lclk_pin = 21;
-const int i2s_bclk_pin = 20;
-const int i2c_scl_pin = 19;
-const int i2c_sda_pin = 18;
-const int uart_rx_pin = 17;
-const int uart_tx_pin = 16;
+#define sw_pin         28
+#define knobB_pin      27
+#define knobA_pin      26
+#define led_pin        25  // regular LED, not neopixel
+#define pico_pwr_pin   23  // HIGH = improved ripple (lower noise) but less efficient
+#define i2s_data_pin   22
+#define i2s_lclk_pin   21
+#define i2s_bclk_pin   20
+#define i2c_scl_pin    19
+#define i2c_sda_pin    18
+#define uart_rx_pin    17
+#define uart_tx_pin    16
+
 const int touch_pins[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 };
-const int touch_count = sizeof(touch_pins) / sizeof(int);
-const int touch_threshold_adjust = 100;
+#define touch_count = sizeof(touch_pins) / sizeof(int);
+#define touch_threshold_adjust = 100;
 // display parameters
-const int oled_i2c_addr = 0x3C;
-const int dw = 128;
-const int dh = 64;
+#define oled_i2c_addr = 0x3C;
+#define dw = 128;
+#define dh = 64;
 
 TouchyTouch touches[touch_count];
 Bounce2::Button button;
