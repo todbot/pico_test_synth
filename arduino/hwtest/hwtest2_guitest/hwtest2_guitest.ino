@@ -36,10 +36,10 @@ const int dw = 128;
 const int dh = 64;
 
 // GUI LAYOUT PARAMETERS
-const int num_disp_params = 5;
+const int num_disp_params = 4;
 const int hilite_param = 0;
 const int line_spacing = 12;  // depends on font
-const int line_offset = 12; // how much to move down from top
+//const int line_offset = 24; // how much to move down from top
 int param_offset = 0;
 
 uint32_t last_status_time;
@@ -51,20 +51,38 @@ Adafruit_SSD1306 display(dw, dh, &Wire1, -1);
 
 SynthUI synthui(&display);
 
-Param params[] = {
-  Param("FREQ", 180.0), 
-  Param("ATCK", 10 ),
-  Param("RELS", 30),
-  Param("RESQ", 150),
-  Param("DTUN", 0.01, /* min */ 0.0, /* max */ 1.0, "%.2f"),
-  Param("NOIS", 50),
-  Param("VMIX", 50),
-  Param("LFOr", 1.2, 0.1, 5.0, "%.2f"),
+// valid params for this synth
+Param patch_params[] = {
+  //Param("filtF", "filter frequency", 180.0),
+  Param("wTyp", 0),
+  Param("fFreq", 180.0),
+  Param("fReso", 150),
+  Param("fAtk", 10),
+  Param("aRel", 30),
+  Param("fAtk", 10),
+  Param("fRel", 30),
+  Param("fType", 0),
+  Param("vMix", 0.01, /* min */ 0.0, /* max */ 1.0, "%.2f"),
+  Param("Nois", 50),
+  Param("fLfoR", 1.2, 0.1, 5.0, "%.2f"),
+  Param("aLfoR", 1.2, 0.1, 5.0, "%.2f"),
+  Param("LfoFr", 0.2, 0.1, 5.0, "%.2f"),
+  Param("LfoAr", 0, 0.1, 5.0, "%.2f"),
   Param("tink", 420, /*min*/ 0, /*max*/ 1000),
   Param("foop", 123),
   Param("BONK", 1),
 };
-const int num_params = sizeof(params) / sizeof(Param);
+const int num_patch_params = sizeof(patch_params) / sizeof(Param);
+//char patch_name[] = "onepatch";
+
+
+Patch patches[] = {
+  Patch("onepatch", patch_params, num_patch_params),
+  Patch("twopatch", patch_params, num_patch_params),   
+  Patch("threepatch", patch_params, num_patch_params),
+};
+int num_patches = sizeof(patches) / sizeof(Patch);
+int patchi = 0;
 
 /**
  */
@@ -95,15 +113,13 @@ void setup() {
   }
 
   display.setRotation(2);  // rotated 180
-  // display.display();       // must clear before display, otherwise shows adafruit logo
-  // delay(500);
   display.clearDisplay();
   display.setFont(&myfont);
 
-  synthui.print_text(10,10, "PICO_TEST_SYNTH", &myfont);
-  display.display();  
+  synthui.print_text(15, line_spacing * 2, "PICO_TEST_SYNTH", &myfont);
+  display.display();
   delay(500);
-  synthui.print_text(10,20, "HWTEST2");
+  synthui.print_text(25, line_spacing * 4, "HWTEST2");
   display.display();
   delay(500);
 }
@@ -124,42 +140,56 @@ void updateInputs() {
  *
  */
 void updateDisplay() {
-  // delay(50);
-  char buf1[20], buf2[20];
+  // delay(50);   // debug
+
+  #define buflen 40
+  char buf1[buflen], buf2[buflen];
   float xpos, ypos;
+  
+  Patch patch = patches[patchi];
+  Param* params = patch.params;
+  int num_params = patch.num_params;
   int hp = hilite_param + param_offset;
- 
+
   byte key = uiGetKey(&xpos, &ypos);
 
-  if( key == KEY_DOWN || key == KEY_UP ) {
+  if (key == KEY_DOWN || key == KEY_UP) {
     Serial.printf("up/down!  ");
-    param_offset =  num_params * xpos; 
+    param_offset = num_params * xpos;
   }
-  if( key == KEY_RIGHT || key == KEY_LEFT ) { 
+  if (key == KEY_RIGHT || key == KEY_LEFT) {
     Serial.printf("left/right!  ");
-    params[hp].set_percent( ypos );
+    params[hp].set_percent(ypos);
   }
+  if( key == KEY_OK ) { 
+    patchi = (patchi+1) % num_patches;
+    return;  // let it update
+  }
+
+  // Serial.printf("patch:'%s'\n", patch.name);
+  // for( int i=0; i<num_params; i++ ) { 
+  //   Serial.printf("  param:'%s' = %.2f\n", params[i].name, params[i].val);
+  // }
 
   display.clearDisplay();
-  display.setFont(&myfont);
-  display.setTextColor(WHITE, 0);
-  
-  synthui.draw_vertical_slider( 122, 0, (float)param_offset / (num_params-num_disp_params+1));
+  snprintf(buf1, buflen, "patch: %s", patch.name);
+  synthui.print_text(0, line_spacing / 2, buf1, &myfont);
+  display.drawLine(0, line_spacing, 127, line_spacing, WHITE);
+
+  synthui.draw_vertical_slider(122, line_spacing, (float)param_offset / num_params, 5, 50);
 
   for (int i = 0; i < num_disp_params; i++) {
-    //display.setFont( );
     int io = i + param_offset;
-    int loff = line_offset + i * line_spacing;
+    int yoff = line_spacing * 2 + i * line_spacing;
     if (io < num_params) {
-      snprintf(buf1, 20, "%s", params[io].name);
-      snprintf(buf2, 20, params[io].fmt, params[io].val);  // param value
-      synthui.print_text(5, loff, buf1, i==hilite_param ? &myfontB : &myfont);
-      synthui.print_text(45, loff, ":", &myfontSM);
-      synthui.print_text(50, loff, buf2);
-      synthui.draw_horizontal_slider( 80, loff, params[io].percent(), 35, 7,7 );
+      snprintf(buf1, buflen, "%s", params[io].name);
+      snprintf(buf2, buflen, params[io].fmt, params[io].val);  // param value
+      synthui.print_text(5, yoff, buf1, i == hilite_param ? &myfontB : &myfont);
+      synthui.print_text(45, yoff, ":", &myfontSM);
+      synthui.print_text(50, yoff, buf2);
+      synthui.draw_horizontal_slider(80, yoff, params[io].percent(), 35, 7, 7);
     }
   }
-  
   display.display();
 }
 
@@ -172,7 +202,6 @@ int uiGetKey(float* xpos, float* ypos) {
   static int knobA_last;
   static int knobB_last;
 
-  button.update();
   int knobA_val = analogRead(knobA_pin);  //knobA_update();
   int knobB_val = analogRead(knobB_pin);  //knobB_update();
 
@@ -201,8 +230,8 @@ int uiGetKey(float* xpos, float* ypos) {
   }
 
   // update the x & y percentage positions, if we've been asked
-  if( xpos!=NULL ) { *xpos = knobA_val / 1024.0; }
-  if( ypos!=NULL ) { *ypos = knobB_val / 1024.0; }
+  if (xpos != NULL) { *xpos = knobA_val / 1024.0; }
+  if (ypos != NULL) { *ypos = knobB_val / 1024.0; }
 
   return key;
 }
