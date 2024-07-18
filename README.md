@@ -1,7 +1,11 @@
 # pico_test_synth
 
-A simple [Raspberry Pi Pico RP2040](https://www.raspberrypi.com/documentation/microcontrollers/raspberry-pi-pico.html)-based
-synth to experiment with [`synthio`](https://github.com/todbot/circuitpython-synthio-tricks).
+A simple 
+[Raspberry Pi Pico RP2040](https://www.raspberrypi.com/documentation/microcontrollers/raspberry-pi-pico.html)-based
+synth to experiment with [`synthio`](https://github.com/todbot/circuitpython-synthio-tricks) and [Mozzi](https://github.com/sensorium/Mozzi).
+
+<a href="https://www.tindie.com/stores/todbot/products/pico_test_synth?ref=offsite_badges&utm_source=sellers_todbot&utm_medium=badges&utm_campaign=badge_small"><img src="https://d2ss6ovg47m0r5.cloudfront.net/badges/tindie-smalls.png" alt="I sell on Tindie" width="200" height="55"></a>
+
 
 <img src="./docs/pico_test_synth_case1_web.jpg" width=500>
 <img src="./docs/pico_test_synth2.jpg" width=500>
