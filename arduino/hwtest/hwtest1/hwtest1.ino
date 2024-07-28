@@ -21,8 +21,8 @@
 #define uart_tx_pin    16
 
 const int touch_pins[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 };
-#define touch_count = sizeof(touch_pins) / sizeof(int);
-#define touch_threshold_adjust = 100;
+const int touch_count = sizeof(touch_pins) / sizeof(int);
+const int touch_threshold_adjust = 100;
 // display parameters
 #define oled_i2c_addr = 0x3C;
 #define dw = 128;

@@ -14,6 +14,18 @@
 #include <Adafruit_TinyUSB.h>
 #include <MIDI.h>
 #include <TouchyTouch.h>
+#include <Wire.h>
+#include <Bounce2.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include "fonts/Dialog_plain_10.h"
+#include "fonts/Dialog_bold_12.h"
+#include "fonts/Dialog_plain_8.h"
+#define myfont Dialog_plain_10
+#define myfontB Dialog_bold_12
+#define myfontSM Dialog_plain_8
+
+#include "SynthUI.h"
 
 #include "MozziConfigValues.h"  // for named option values
 #define MOZZI_AUDIO_MODE MOZZI_OUTPUT_I2S_DAC
@@ -24,7 +36,7 @@
 #define MOZZI_I2S_PIN_WS (MOZZI_I2S_PIN_BCK+1) // HAS TO BE NEXT TO pBCLK, i.e. default is 21
 #define MOZZI_I2S_PIN_DATA 22
 #define MOZZI_ANALOG_READ MOZZI_ANALOG_READ_NONE  // we're using regular analogRead()
-//#define OSCIL_DITHER_PHASE 1 
+// #define OSCIL_DITHER_PHASE 1 
 // Mozzi's controller update rate, seems to have issues at 1024
 // If slower than 512 can't get all MIDI from Live
 #define MOZZI_CONTROL_RATE 512  // mozzi rate for updateControl()
@@ -43,29 +55,42 @@
 #include <mozzi_rand.h> // for rand()
 
 
-#define sw_pin         28
-#define knobB_pin      27
-#define knobA_pin      26
-#define led_pin        25  // regular LED, not neopixel
-#define pico_pwr_pin   23  // HIGH = improved ripple (lower noise) but less efficient
-#define i2s_data_pin   22  //
-#define i2s_lclk_pin   21
-#define i2s_bclk_pin   20
-#define i2c_scl_pin    19  // on I2C1 aka Wire1
-#define i2c_sda_pin    18
-#define uart_rx_pin    17  // on UART0 aka Serial1
-#define uart_tx_pin    16
+const int sw_pin        = 28;
+const int knobB_pin     = 27;
+const int knobA_pin     = 26;
+const int led_pin       = 25;  // regular LED, not neopixel
+const int pico_pwr_pin  = 23;  // HIGH = improved ripple (lower noise) but less efficient
+const int i2s_data_pin  = 22;  //
+const int i2s_lclk_pin  = 21;
+const int i2s_bclk_pin  = 20;
+const int i2c_scl_pin   = 19;  // on I2C1 aka Wire1
+const int i2c_sda_pin   = 18;
+const int uart_rx_pin   = 17;  // on UART0 aka Serial1
+const int uart_tx_pin   = 16;
+
+// DISPLAY PARAMTERS
+const int oled_i2c_addr = 0x3C;
+const int dw = 128;
+const int dh = 64;
 
 Adafruit_USBD_MIDI usb_midi;                                  // USB MIDI object
 MIDI_CREATE_INSTANCE(Adafruit_USBD_MIDI, usb_midi, MIDIusb);  // USB MIDI
-// MIDI_CREATE_INSTANCE(HardwareSerial, Serial1, MIDIuart);      // Serial MIDI
+MIDI_CREATE_INSTANCE(HardwareSerial, Serial1, MIDIuart);      // Serial MIDI
 
 const int touch_pins[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 };
 const int touch_count = sizeof(touch_pins) / sizeof(int);
 const int touch_threshold_adjust = 100;
 
 TouchyTouch touches[touch_count];
-bool touched[touch_count];
+Bounce2::Button button;
+Adafruit_SSD1306 display(dw, dh, &Wire1, -1);
+SynthUI synthui(&display);
+
+// GUI LAYOUT PARAMETERS
+int num_disp_params = 3;
+int hilite_param = 0;
+int line_spacing = 12;  // depends on font
+int param_offset = 0;
 
 // SETTINGS
 //int portamento_time = 50;  // milliseconds
@@ -103,14 +128,6 @@ typedef struct {
     float release_time;
 } Patch;
 
-
-//struct MySettings : public MIDI_NAMESPACE::DefaultSettings {
-//  static const bool Use1ByteParsing = false; // Allow MIDI.read to handle all received data in one go
-//  static const long BaudRate = 31250;        // Doesn't build without this...
-//};
-//MIDI_CREATE_CUSTOM_INSTANCE(HardwareSerial, Serial1, MIDI, MySettings); // for USB-based SAMD
-//MIDI_CREATE_DEFAULT_INSTANCE();
-
 //
 Oscil<SAW_ANALOGUE512_NUM_CELLS, MOZZI_AUDIO_RATE> aOsc1(SAW_ANALOGUE512_DATA);
 Oscil<SAW_ANALOGUE512_NUM_CELLS, MOZZI_AUDIO_RATE> aOsc2(SAW_ANALOGUE512_DATA);
@@ -126,23 +143,51 @@ uint32_t last_debug_millis;
 
 // core0 is UI
 void setup() { 
-  pinMode(LED_BUILTIN, OUTPUT);
-
-  // Serial1.setRX(uart_rx_pin);
-  // Serial1.setTX(uart_tx_pin);
+  Serial1.setRX(uart_rx_pin);
+  Serial1.setTX(uart_tx_pin);
 
   Serial.begin(115200);
   MIDIusb.begin(MIDI_CHANNEL_OMNI);
   MIDIusb.turnThruOff();   // turn off echo
-  // MIDIuart.begin(MIDI_CHANNEL_OMNI); // don't forget OMNI
-  // MIDIuart.turnThruOff();  // turn off echo
+  MIDIuart.begin(MIDI_CHANNEL_OMNI); // don't forget OMNI
+  MIDIuart.turnThruOff();  // turn off echo
+
+  // KNOBS & BUTTON & LED
+  pinMode(led_pin, OUTPUT);
+  button.attach(sw_pin, INPUT_PULLUP);
+  button.setPressedState(LOW);
 
   // TOUCH
   for (int i = 0; i < touch_count; i++) {
     touches[i].begin(touch_pins[i]);
     touches[i].threshold += touch_threshold_adjust;  // make a bit more noise-proof
-    touched[i] = false;
   }
+
+  // DISPLAY
+  Wire1.setSDA(i2c_sda_pin);
+  Wire1.setSCL(i2c_scl_pin);
+  Wire1.begin();
+
+  if (!display.begin(SSD1306_SWITCHCAPVCC, oled_i2c_addr)) {
+    Serial.println(F("SSD1306 allocation failed"));
+    for (;;) ;  // Don't proceed, loop forever
+  }
+  display.setRotation(2);  // rotated 180
+  display.clearDisplay();
+
+  int16_t x1, y1;
+  uint16_t w, h;
+  display.setFont(&myfontB);
+  display.getTextBounds("HELLO", 0, 20, &x1, &y1, &w, &h);
+  line_spacing = h * 1.5;
+
+  synthui.print_text(0, line_spacing * 1, "PICO_TEST_SYNTH", &myfont);
+  display.display();
+  delay(500);
+  synthui.print_text(15, line_spacing * 2, "MONOSYNTH1");
+  //synthui.print_textf(0, line_spacing * 4, "params:%d patches:%d", num_patch_params, num_patches);
+  display.display();
+  delay(2500);
 }
 
 // core0 is UI
@@ -153,6 +198,7 @@ void loop() {
 
   if( millis() - last_debug_millis > 100 ) { 
     last_debug_millis = millis();
+    Serial.print("boop: ");
     for (int i = 0; i < touch_count; i++) {
       char t = touches[i].touched() ? '|' : ' ';  // indicates a touched value
       int touchval = touches[i].raw_value / 100;  // make a more printalbe value
@@ -165,6 +211,9 @@ void loop() {
 
 // core1 is audio
 void setup1() {
+
+  delay(1000);
+
   startMozzi(MOZZI_CONTROL_RATE);
   handleProgramChange(patch_num); // set our initial patch
  }
@@ -279,6 +328,24 @@ void handleMIDI() {
         break;
       case midi::NoteOff:
         handleNoteOff( 0, MIDIusb.getData1(),MIDIusb.getData2());
+        break;
+      default:
+        break;
+    }
+  }
+  while( MIDIuart.read() ) {  // use while() to read all pending MIDI, shouldn't hang
+    switch(MIDIuart.getType()) {
+      case midi::ProgramChange:
+        handleProgramChange(MIDIuart.getData1());
+        break;
+      case midi::ControlChange:
+        handleControlChange(0, MIDIuart.getData1(), MIDIuart.getData2());
+        break;
+      case midi::NoteOn:
+        handleNoteOn( 0, MIDIuart.getData1(),MIDIuart.getData2());
+        break;
+      case midi::NoteOff:
+        handleNoteOff( 0, MIDIuart.getData1(),MIDIuart.getData2());
         break;
       default:
         break;
