@@ -26,6 +26,7 @@ synth to experiment with [`synthio`](https://github.com/todbot/circuitpython-syn
 * One switch for controlling parameters
 * 16 capsense touch buttons for synth triggering
 * USB MIDI in/out of course too
+* **(NOTE: this board will NOT work with the Pico2, since its RP2350 chip has a hardware error)**
 
 ### Software
 
