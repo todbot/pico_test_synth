@@ -206,6 +206,12 @@
 <text x="-2.54" y="-5.08" size="1.778" layer="96" rot="R90">&gt;VALUE</text>
 <pin name="+3V3" x="0" y="-2.54" visible="off" length="short" direction="sup" rot="R90"/>
 </symbol>
+<symbol name="+5V" urn="urn:adsk.eagle:symbol:26929/1" library_version="1">
+<wire x1="1.27" y1="-1.905" x2="0" y2="0" width="0.254" layer="94"/>
+<wire x1="0" y1="0" x2="-1.27" y2="-1.905" width="0.254" layer="94"/>
+<text x="-2.54" y="-5.08" size="1.778" layer="96" rot="R90">&gt;VALUE</text>
+<pin name="+5V" x="0" y="-2.54" visible="off" length="short" direction="sup" rot="R90"/>
+</symbol>
 </symbols>
 <devicesets>
 <deviceset name="GND" urn="urn:adsk.eagle:component:26954/1" prefix="GND" library_version="1">
@@ -225,6 +231,19 @@
 <description>&lt;b&gt;SUPPLY SYMBOL&lt;/b&gt;</description>
 <gates>
 <gate name="G$1" symbol="+3V3" x="0" y="0"/>
+</gates>
+<devices>
+<device name="">
+<technologies>
+<technology name=""/>
+</technologies>
+</device>
+</devices>
+</deviceset>
+<deviceset name="+5V" urn="urn:adsk.eagle:component:26963/1" prefix="P+" library_version="1">
+<description>&lt;b&gt;SUPPLY SYMBOL&lt;/b&gt;</description>
+<gates>
+<gate name="1" symbol="+5V" x="0" y="0"/>
 </gates>
 <devices>
 <device name="">
@@ -12470,12 +12489,13 @@ by exp-project-lbr.ulp</description>
 <part name="R16" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="R-EU_" device="R0805" package3d_urn="urn:adsk.eagle:package:23553/2" value="1M"/>
 <part name="GND26" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="GND" device=""/>
 <part name="GND27" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="GND" device=""/>
-<part name="+3V3" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="+3V3" device=""/>
 <part name="GND28" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="GND" device=""/>
 <part name="R18" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="R-EU_" device="R0805" package3d_urn="urn:adsk.eagle:package:23553/2" value="33"/>
 <part name="R17" library="rcl" library_urn="urn:adsk.eagle:library:334" deviceset="R-EU_" device="R0805" package3d_urn="urn:adsk.eagle:package:23553/2" value="10"/>
 <part name="+3V4" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="+3V3" device=""/>
 <part name="GND2" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="GND" device=""/>
+<part name="P+1" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="+5V" device=""/>
+<part name="P+2" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="+5V" device=""/>
 </parts>
 <sheets>
 <sheet>
@@ -12770,9 +12790,6 @@ by exp-project-lbr.ulp</description>
 <instance part="GND27" gate="1" x="165.1" y="86.36" smashed="yes" rot="R270">
 <attribute name="VALUE" x="162.56" y="88.9" size="1.778" layer="96" rot="R270"/>
 </instance>
-<instance part="+3V3" gate="G$1" x="157.48" y="83.82" smashed="yes" rot="MR270">
-<attribute name="VALUE" x="157.226" y="82.042" size="1.778" layer="96" rot="MR0"/>
-</instance>
 <instance part="GND28" gate="1" x="165.1" y="96.52" smashed="yes" rot="R270">
 <attribute name="VALUE" x="162.56" y="99.06" size="1.778" layer="96" rot="R270"/>
 </instance>
@@ -12789,6 +12806,12 @@ by exp-project-lbr.ulp</description>
 </instance>
 <instance part="GND2" gate="1" x="63.5" y="124.46" smashed="yes" rot="MR0">
 <attribute name="VALUE" x="66.04" y="121.92" size="1.778" layer="96" rot="MR0"/>
+</instance>
+<instance part="P+1" gate="1" x="76.2" y="195.58" smashed="yes" rot="R270">
+<attribute name="VALUE" x="78.74" y="195.58" size="1.778" layer="96"/>
+</instance>
+<instance part="P+2" gate="1" x="157.48" y="83.82" smashed="yes" rot="R90">
+<attribute name="VALUE" x="154.94" y="83.82" size="1.778" layer="96" rot="R180"/>
 </instance>
 </instances>
 <busses>
@@ -13013,11 +13036,6 @@ by exp-project-lbr.ulp</description>
 <segment>
 <pinref part="R22" gate="G$1" pin="1"/>
 <pinref part="+3V94" gate="G$1" pin="+3V3"/>
-</segment>
-<segment>
-<pinref part="U2" gate="G$1" pin="VIN"/>
-<pinref part="+3V3" gate="G$1" pin="+3V3"/>
-<wire x1="160.02" y1="83.82" x2="187.96" y2="83.82" width="0.1524" layer="91"/>
 </segment>
 <segment>
 <pinref part="R18" gate="G$1" pin="1"/>
@@ -13372,16 +13390,23 @@ by exp-project-lbr.ulp</description>
 <wire x1="63.5" y1="187.96" x2="68.58" y2="187.96" width="0.1524" layer="91"/>
 </segment>
 </net>
-<net name="N$5" class="0">
-<segment>
-<pinref part="U1" gate="G$1" pin="VSYS"/>
-<wire x1="63.5" y1="195.58" x2="68.58" y2="195.58" width="0.1524" layer="91"/>
-</segment>
-</net>
 <net name="N$6" class="0">
 <segment>
 <pinref part="U1" gate="G$1" pin="VBUS"/>
 <wire x1="63.5" y1="198.12" x2="68.58" y2="198.12" width="0.1524" layer="91"/>
+</segment>
+</net>
+<net name="+5V" class="0">
+<segment>
+<pinref part="U1" gate="G$1" pin="VSYS"/>
+<wire x1="63.5" y1="195.58" x2="68.58" y2="195.58" width="0.1524" layer="91"/>
+<pinref part="P+1" gate="1" pin="+5V"/>
+<wire x1="73.66" y1="195.58" x2="68.58" y2="195.58" width="0.1524" layer="91"/>
+</segment>
+<segment>
+<pinref part="U2" gate="G$1" pin="VIN"/>
+<wire x1="160.02" y1="83.82" x2="187.96" y2="83.82" width="0.1524" layer="91"/>
+<pinref part="P+2" gate="1" pin="+5V"/>
 </segment>
 </net>
 </nets>
@@ -13394,7 +13419,6 @@ by exp-project-lbr.ulp</description>
 <approved hash="106,1,63.5,185.42,N$3,,,,,"/>
 <approved hash="209,1,63.5,187.96,N$4,,,,,"/>
 <approved hash="106,1,63.5,187.96,N$4,,,,,"/>
-<approved hash="106,1,63.5,195.58,N$5,,,,,"/>
 <approved hash="106,1,63.5,198.12,N$6,,,,,"/>
 <approved hash="113,1,139.596,107.846,FRAME1,,,,,"/>
 </errors>
