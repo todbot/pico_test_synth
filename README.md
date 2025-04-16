@@ -55,7 +55,7 @@ or use M2.5 screws and nuts to secure the PCB more permanently.
 
 ### Pins used
 
-The board uses all of the QTPy RP2040 pins:
+The board uses all of the Raspberry Pi Pico pins:
 
 * `board.GP28` - middle button
 * `board.GP27` - right knob
