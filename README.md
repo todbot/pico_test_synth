@@ -26,7 +26,7 @@ synth to experiment with [`synthio`](https://github.com/todbot/circuitpython-syn
 * One switch for controlling parameters
 * 16 capsense touch buttons for synth triggering
 * USB MIDI in/out of course too
-* **(NOTE: this board will NOT work with the Pico2, since its RP2350 chip has a hardware error)**
+* **(NOTE: the pico_test_synth1 PCB will NOT work with the Pico2, since its RP2350 chip has a hardware error)**
 
 ### Software
 
@@ -72,6 +72,8 @@ The board uses all of the Raspberry Pi Pico pins:
 For more details see [`hwtest/code.py`](https://github.com/todbot/pico_test_synth/tree/main/circuitpython/hwtest/code.py).
 
 
-### Schematic
+### Schematics
 
-[<img src="./docs/pico_test_synth1_sch.png" width=500>](./schematics/pico_test_synth1_sch.pdf)
+[<img src="./docs/pico_test_synth1_sch.png" width=500>](./schematics/pico_test_synth1/pico_test_synth1_sch.pdf)
+
+
