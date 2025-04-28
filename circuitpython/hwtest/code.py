@@ -23,7 +23,7 @@ import board, busio
 import analogio, keypad
 import audiobusio, audiomixer, synthio
 import ulab.numpy as np
-import displayio, terminalio
+import i2cdisplaybus, displayio, terminalio
 import adafruit_displayio_ssd1306
 from adafruit_display_text import bitmap_label as label
 import touchio
@@ -34,7 +34,7 @@ import usb_midi
 midi_notes = list(range(45,45+16))
 filter_freq = 4000
 filter_resonance = 1.2
-output_volume = 0.75 # turn down the volume a bit since this can get loud
+output_volume = 1.0
 
 # pin definitions
 sw_pin        = board.GP28
@@ -67,17 +67,17 @@ touchs = []
 for pin in touch_pins:
     print("touch pin:", pin)
     touchin = touchio.TouchIn(pin)
-    touchin.threshold = int(touchin.threshold * 1.05)
+    touchin.threshold = int(touchin.threshold * 1.1)
     touchins.append(touchin)
     touchs.append(Debouncer(touchin))
 
-
+print("starting up...")
 midi_in_usb = usb_midi.ports[0]
 midi_in_uart = busio.UART(rx=uart_rx_pin, tx=uart_tx_pin, baudrate=31250, timeout=0.001)
 i2c = busio.I2C(scl=i2c_scl_pin, sda=i2c_sda_pin, frequency=1_000_000)
 
 dw,dh = 128, 64
-display_bus = displayio.I2CDisplay(i2c, device_address=0x3c)
+display_bus = i2cdisplaybus.I2CDisplayBus(i2c, device_address=0x3c)
 display = adafruit_displayio_ssd1306.SSD1306(display_bus, width=dw, height=dh, rotation=180)
 
 # set up the synth->audio system
@@ -98,7 +98,7 @@ synth.envelope = amp_env
 
 # set up info to be displayed
 maingroup = displayio.Group()
-display.show(maingroup)
+display.root_group = maingroup
 text1 = label.Label(terminalio.FONT, text="pico_test_synth", x=0, y=10)
 text2 = label.Label(terminalio.FONT, text="@todbot", x=0, y=25)
 text3 = label.Label(terminalio.FONT, text="pico_test_synth!", x=0, y=50)
@@ -116,13 +116,14 @@ def check_touch():
         if touch.rose:
             print("touch press",i)
             f = synthio.midi_to_hz(midi_notes[i])
-            filter = synth.low_pass_filter(filter_freq, filter_resonance)
-            n = synthio.Note( frequency=f, waveform=wave_saw, filter=filter )
+            filter = synthio.Biquad(synthio.FilterMode.LOW_PASS, filter_freq, filter_resonance)
+            n = synthio.Note(frequency=f, waveform=wave_saw, filter=filter, amplitude=0.75)
             synth.press( n )
             touch_notes[i] = n
         if touch.fell:
             print("touch release", i)
-            synth.release( touch_notes[i] )
+            if touch_notes[i]:
+                synth.release( touch_notes[i] )
 
 async def debug_printer():
     t1_last = ""
@@ -153,8 +154,9 @@ async def input_handler():
 
         for n in touch_notes:  # real-time adjustment of filter
             if n:
-                n.filter = synth.low_pass_filter(filter_freq, filter_resonance)
-
+                n.filter.frequency = filter_freq
+                n.filter.Q = filter_resonance
+                
         check_touch()
 
         if key := keys.events.get():
@@ -164,7 +166,7 @@ async def input_handler():
             if key.pressed:
                 sw_pressed = True
                 f = synthio.midi_to_hz(random.randint(32,60))
-                note = synthio.Note(frequency=f, waveform=wave_saw) # , filter=filter)
+                note = synthio.Note(frequency=f, waveform=wave_saw, amplitude=0.8)
                 synth.press(note)
         await asyncio.sleep(0.001)
 

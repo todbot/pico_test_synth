@@ -4,6 +4,9 @@
 import time
 import board
 import touchio
+import digitalio
+
+pull_type = digitalio.Pull.UP
 
 touch_pins = (
     board.GP0, board.GP1, board.GP2, board.GP3, board.GP4, board.GP5,
@@ -13,7 +16,7 @@ touch_pins = (
 touchins = []
 for pin in touch_pins:
     print("touch pin:", pin)   # print here let's us diagnose if a pin is bad
-    touchin = touchio.TouchIn(pin)
+    touchin = touchio.TouchIn(pin, pull=pull_type)
     touchin.threshold = int(touchin.threshold * 1.05)
     touchins.append(touchin)
 
