@@ -1,5 +1,6 @@
 # pico_test_synth_hwtest_code.py -- test hardware of pico_test_synth board
 # 27 Jun 2023 - 15 Feb 2024 - @todbot / Tod Kurt
+# 3 May 2025 - updated for CircuitPython 10
 #
 # Functionality:
 # - touch pads to trigger synth notes (defined in 'midi_notes')
@@ -29,9 +30,14 @@ from adafruit_display_text import bitmap_label as label
 import touchio
 from adafruit_debouncer import Debouncer
 import usb_midi
+import adafruit_midi
+from adafruit_midi.note_on import NoteOn
+from adafruit_midi.note_off import NoteOff
+from adafruit_midi.control_change import ControlChange
 
-#midi_notes = (33, 45, 52, 57)
-midi_notes = list(range(45,45+16))
+SAMPLE_RATE = 28000
+BUFFER_SIZE = 4096   # need a bigger buffer when screen updated
+midi_notes = list(range(48,48+16))  # which MIDI notes the touch pads send
 filter_freq = 4000
 filter_resonance = 1.2
 output_volume = 1.0
@@ -72,9 +78,10 @@ for pin in touch_pins:
     touchs.append(Debouncer(touchin))
 
 print("starting up...")
-midi_in_usb = usb_midi.ports[0]
-midi_in_uart = busio.UART(rx=uart_rx_pin, tx=uart_tx_pin, baudrate=31250, timeout=0.001)
 i2c = busio.I2C(scl=i2c_scl_pin, sda=i2c_sda_pin, frequency=1_000_000)
+uart = busio.UART(rx=uart_rx_pin, tx=uart_tx_pin, baudrate=31250, timeout=0.001)
+midi_uart = adafruit_midi.MIDI(midi_in=uart, midi_out=uart)
+midi_usb = adafruit_midi.MIDI(midi_in=usb_midi.ports[0], midi_out=usb_midi.ports[1])
 
 dw,dh = 128, 64
 display_bus = i2cdisplaybus.I2CDisplayBus(i2c, device_address=0x3c)
@@ -82,16 +89,16 @@ display = adafruit_displayio_ssd1306.SSD1306(display_bus, width=dw, height=dh, r
 
 # set up the synth->audio system
 audio = audiobusio.I2SOut(bit_clock=i2s_bclk_pin, word_select=i2s_lclk_pin, data=i2s_data_pin)
-mixer = audiomixer.Mixer(voice_count=1, sample_rate=28000, channel_count=1,
+mixer = audiomixer.Mixer(voice_count=1, sample_rate=SAMPLE_RATE, channel_count=1,
                          bits_per_sample=16, samples_signed=True,
-                         buffer_size=4096)  # buffer_size=4096)  # need a big buffer when screen updated
-synth = synthio.Synthesizer(sample_rate=28000)
+                         buffer_size=BUFFER_SIZE) 
+synth = synthio.Synthesizer(sample_rate=SAMPLE_RATE)
 audio.play(mixer)
 mixer.voice[0].level = output_volume
 mixer.voice[0].play(synth)
 
 # set up the synth
-wave_saw = np.linspace(20000,-20000, num=512, dtype=np.int16)  # default squ is too clippy
+wave_saw = np.linspace(32000,-32000, num=256, dtype=np.int16)  # default squ is too clippy
 #amp_env = synthio.Envelope(attack_level=1.0, sustain_level=1.0, release_time=0.4, attack_time=0.4, decay_time=0.5)
 amp_env = synthio.Envelope(release_time=0.3, attack_time=0.3)
 synth.envelope = amp_env
@@ -106,25 +113,35 @@ for t in (text1, text2, text3):
     maingroup.append(t)
 time.sleep(1)
 
-touch_notes = [None] * len(midi_notes)
+notes_pressed = {}
 sw_pressed = False
 
+def note_on(midi_note):
+    print("note_on:", midi_note)
+    note_off(midi_note)  # only one note per midi_note allowed 
+    f = synthio.midi_to_hz(midi_note)
+    filter = synthio.Biquad(synthio.FilterMode.LOW_PASS, filter_freq, filter_resonance)
+    n = synthio.Note(frequency=f, waveform=wave_saw, filter=filter, amplitude=0.75)
+    synth.press( n )
+    notes_pressed[midi_note] = n
+
+def note_off(midi_note):
+    if n := notes_pressed.get(midi_note,None):
+        synth.release(n)
+
+# check the touch pads and trigger synthio notes
 def check_touch():
     for i in range(len(touchs)):
         touch = touchs[i]
         touch.update()
         if touch.rose:
             print("touch press",i)
-            f = synthio.midi_to_hz(midi_notes[i])
-            filter = synthio.Biquad(synthio.FilterMode.LOW_PASS, filter_freq, filter_resonance)
-            n = synthio.Note(frequency=f, waveform=wave_saw, filter=filter, amplitude=0.75)
-            synth.press( n )
-            touch_notes[i] = n
+            note_on(midi_notes[i])
         if touch.fell:
             print("touch release", i)
-            if touch_notes[i]:
-                synth.release( touch_notes[i] )
-
+            note_off(midi_notes[i])
+            
+# print to REPL current state of knobs, button, and touchpads
 async def debug_printer():
     t1_last = ""
     t2_last = ""
@@ -142,17 +159,17 @@ async def debug_printer():
         print("T:" + ''.join(["%3d " % (t.raw_value//16) for t in touchins[0:4]]))
         await asyncio.sleep(0.3)
 
+# handle all user input: knobs, button, and touchpads
 async def input_handler():
-    global sw_pressed
     global filter_freq, filter_resonance
 
-    note = None
+    midi_note = None
 
     while True:
-        filter_freq = knobA.value/65535 * 8000 + 100  # range 100-8100
+        filter_freq = knobA.value/65535 * 8000 + 1  # range 1-8001
         filter_resonance = knobB.value/65535 * 3 + 0.2  # range 0.2-3.2
 
-        for n in touch_notes:  # real-time adjustment of filter
+        for n in notes_pressed.values():  # real-time adjustment of filter
             if n:
                 n.filter.frequency = filter_freq
                 n.filter.Q = filter_resonance
@@ -160,33 +177,25 @@ async def input_handler():
         check_touch()
 
         if key := keys.events.get():
-            if key.released:
-                sw_pressed = False
-                synth.release( note )
             if key.pressed:
                 sw_pressed = True
-                f = synthio.midi_to_hz(random.randint(32,60))
-                note = synthio.Note(frequency=f, waveform=wave_saw, amplitude=0.8)
-                synth.press(note)
+                midi_note = random.randint(32,60)
+                note_on(midi_note)
+            if key.released:
+                sw_pressed = False
+                note_off(midi_note)
         await asyncio.sleep(0.001)
+
 
 async def midi_handler():
     while True:
-        while msg := midi_in_uart.read(3):
-            print("midi in uart:", [hex(b) for b in msg])
-            if msg[0] == 0x90:  # note on
-                synth.press( msg[1] )
-            elif msg[0] == 0x80 or msg[0] == 0x90 and msg[2] ==0: # note off
-                synth.release( msg[1] )
-
-        while msg := midi_in_usb.read(3):
-            print("midi in usb:", [hex(b) for b in msg])
-            if msg[0] == 0x90:  # note on
-                synth.press( msg[1] )
-            elif msg[0] == 0x80 or msg[0] == 0x90 and msg[2] ==0: # note off
-                synth.release( msg[1] )
-
+        while msg := midi_usb.receive() or midi_uart.receive():
+            if isinstance(msg, NoteOn) and msg.velocity != 0:
+                note_on(msg.note)
+            elif isinstance(msg,NoteOff) or isinstance(msg,NoteOn) and msg.velocity==0:
+                note_off(msg.note)
         await asyncio.sleep(0)
+
 
 # main coroutine
 async def main():  # Don't forget the async!
