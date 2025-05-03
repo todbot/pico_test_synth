@@ -14,8 +14,9 @@
 # - adafruit_debouncer
 # - adafruit_displayio_ssd1306
 # - adafruit_display_text
+# - adafruit_midi
 # Install them all with:
-#   circup install asyncio adafruit_debouncer adafruit_displayio_ssd1306 adafruit_display_text
+#   circup install asyncio adafruit_debouncer adafruit_displayio_ssd1306 adafruit_display_text adafruit_midi
 #
 #
 import asyncio
@@ -136,10 +137,18 @@ def check_touch():
         touch.update()
         if touch.rose:
             print("touch press",i)
-            note_on(midi_notes[i])
+            midi_note = midi_notes[i]
+            note_on(midi_note)
+            msg = NoteOn(midi_note, velocity=100)
+            midi_usb.send( msg )
+            midi_uart.send( msg )
         if touch.fell:
             print("touch release", i)
-            note_off(midi_notes[i])
+            midi_note = midi_notes[i]
+            note_off(midi_note)
+            msg = NoteOff(midi_note, velocity=0)
+            midi_usb.send( msg )
+            midi_uart.send( msg )
             
 # print to REPL current state of knobs, button, and touchpads
 async def debug_printer():
