@@ -6689,7 +6689,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "todbot_stuff:Pad-CapTouch-10mm-roundrect"
+		(property "Footprint" "todbot_stuff:Pad-CapTouch-11_2mm-roundrect"
 			(at 203.2 146.05 0)
 			(effects
 				(font
@@ -6929,7 +6929,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "todbot_stuff:Pad-CapTouch-10mm-roundrect"
+		(property "Footprint" "todbot_stuff:Pad-CapTouch-11_2mm-roundrect"
 			(at 248.92 146.05 0)
 			(effects
 				(font
@@ -7065,7 +7065,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "todbot_stuff:Pad-CapTouch-10mm-roundrect"
+		(property "Footprint" "todbot_stuff:Pad-CapTouch-11_2mm-roundrect"
 			(at 261.62 113.03 0)
 			(effects
 				(font
@@ -7271,7 +7271,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "todbot_stuff:Pad-CapTouch-10mm-roundrect"
+		(property "Footprint" "todbot_stuff:Pad-CapTouch-11_2mm-roundrect"
 			(at 191.77 146.05 0)
 			(effects
 				(font
@@ -7407,7 +7407,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "todbot_stuff:Pad-CapTouch-10mm-roundrect"
+		(property "Footprint" "todbot_stuff:Pad-CapTouch-11_2mm-roundrect"
 			(at 193.04 113.03 0)
 			(effects
 				(font
@@ -7556,7 +7556,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "todbot_stuff:Pad-CapTouch-10mm-roundrect"
+		(property "Footprint" "todbot_stuff:Pad-CapTouch-11_2mm-roundrect"
 			(at 238.76 113.03 0)
 			(effects
 				(font
@@ -8317,7 +8317,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "todbot_stuff:Pad-CapTouch-10mm-roundrect"
+		(property "Footprint" "todbot_stuff:Pad-CapTouch-11_2mm-roundrect"
 			(at 271.78 146.05 0)
 			(effects
 				(font
@@ -8786,7 +8786,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "todbot_stuff:Pad-CapTouch-10mm-roundrect"
+		(property "Footprint" "todbot_stuff:Pad-CapTouch-11_2mm-roundrect"
 			(at 260.35 146.05 0)
 			(effects
 				(font
@@ -8852,7 +8852,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "todbot_stuff:Pad-CapTouch-10mm-roundrect"
+		(property "Footprint" "todbot_stuff:Pad-CapTouch-11_2mm-roundrect"
 			(at 226.06 146.05 0)
 			(effects
 				(font
@@ -8987,7 +8987,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "todbot_stuff:Pad-CapTouch-10mm-roundrect"
+		(property "Footprint" "todbot_stuff:Pad-CapTouch-11_2mm-roundrect"
 			(at 273.05 113.03 0)
 			(effects
 				(font
@@ -9552,7 +9552,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "todbot_stuff:Pad-CapTouch-10mm-roundrect"
+		(property "Footprint" "todbot_stuff:Pad-CapTouch-11_2mm-roundrect"
 			(at 214.63 146.05 0)
 			(effects
 				(font
@@ -9816,7 +9816,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "todbot_stuff:Pad-CapTouch-10mm-roundrect"
+		(property "Footprint" "todbot_stuff:Pad-CapTouch-11_2mm-roundrect"
 			(at 237.49 146.05 0)
 			(effects
 				(font
@@ -10476,13 +10476,12 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "todbot_stuff:Pad-CapTouch-10mm-roundrect"
+		(property "Footprint" "todbot_stuff:Pad-CapTouch-11_2mm-roundrect"
 			(at 215.9 113.03 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(hide yes)
 			)
 		)
 		(property "Datasheet" "~"
@@ -10752,7 +10751,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "todbot_stuff:Pad-CapTouch-10mm-roundrect"
+		(property "Footprint" "todbot_stuff:Pad-CapTouch-11_2mm-roundrect"
 			(at 204.47 113.03 0)
 			(effects
 				(font
@@ -11667,7 +11666,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "todbot_stuff:Pad-CapTouch-10mm-roundrect"
+		(property "Footprint" "todbot_stuff:Pad-CapTouch-11_2mm-roundrect"
 			(at 227.33 113.03 0)
 			(effects
 				(font
@@ -12135,7 +12134,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "todbot_stuff:Pad-CapTouch-10mm-roundrect"
+		(property "Footprint" "todbot_stuff:Pad-CapTouch-11_2mm-roundrect"
 			(at 250.19 113.03 0)
 			(effects
 				(font
