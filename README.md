@@ -7,15 +7,21 @@ synth to experiment with [`synthio`](https://github.com/todbot/circuitpython-syn
 <a href="https://www.tindie.com/products/todbot/pico_test_synth/?ref=offsite_badges&utm_source=sellers_todbot&utm_medium=badges&utm_campaign=badge_small"><img src="https://d2ss6ovg47m0r5.cloudfront.net/badges/tindie-smalls.png" alt="I sell on Tindie" width="200" height="55"></a>
 
 
-<img src="./docs/pico_test_synth_case1_web.jpg" width=500>
-<img src="./docs/pico_test_synth2.jpg" width=500>
+<h3>pico_test_synth2</h3>
 
-**video demo**
+<img src="./docs/pico_test_synth2_case1_web.jpg" width=400><img src="./docs/pico_test_synth2_photo1.jpg" width=400>
+
+<h3>pico_test_synth, the original</h3>
+<img src="./docs/pico_test_synth_case1_web.jpg" width=400><img src="./docs/pico_test_synth_photo1.jpg" width=400>
+
+
+
+<h3>video demo</h3>
 
 [![video demo](https://img.youtube.com/vi/9U2Dn7ckdbs/0.jpg)](https://www.youtube.com/watch?v=9U2Dn7ckdbs)
 
 
-** [Available on Tindie](https://www.tindie.com/products/todbot/pico_test_synth/) **
+** **[Available on Tindie](https://www.tindie.com/products/todbot/pico_test_synth/)** **
 
 ### Features
 
@@ -74,6 +80,11 @@ For more details see [`hwtest/code.py`](https://github.com/todbot/pico_test_synt
 
 ### Schematics
 
-[<img src="./docs/pico_test_synth1_sch.png" width=500>](./schematics/pico_test_synth1/pico_test_synth1_sch.pdf)
+#### pico_test_synth2 ####
+[<img src="./docs/pico_test_synth2_sch.png" width=700>](./schematics/pico_test_synth2/pico_test_synth2_sch.pdf)
+
+
+#### pico_test_synth, original ####
+[<img src="./docs/pico_test_synth1_sch.png" width=600>](./schematics/pico_test_synth1/pico_test_synth1_sch.pdf)
 
 
