@@ -91,6 +91,15 @@ class PolyWaveSynth(Instrument):
         lfo1 = synthio.Math( synthio.MathOperation.SCALE_OFFSET, raw_lfo1, 0.5, 0.5) # unipolar
         self.wave_lfo = lfo1
         self.synth.blocks.append(lfo1)  # global lfo for wave_lfo
+        
+        if self.patch.filt_type == "LP":
+            self.filter_mode = synthio.FilterMode.LOW_PASS
+        elif self.patch.filt_type == "HP":
+            self.filter_mode = synthio.FilterMode.HIGH_PASS
+        elif self.patch.filt_type == "BP":
+            self.filter_mode = synthio.FilterMode.BAND_PASS
+        else: 
+            self.filter_mode = None
 
         # standard two-osc oscillator patch
         if patch.wave_type == WaveType.OSC:
@@ -115,30 +124,14 @@ class PolyWaveSynth(Instrument):
         self.load_patch(self.patch)
 
     def _update_filter(self, osc1, osc2, filt_env):
-        # prevent filter instability around note frequency
-        # filter unstable <oscfreq?
-        #if self.patch.filt_f / osc1.frequency < 1.2:  filt_q = filt_q / 2
-        #filt_f = max(self.patch.filt_f * filt_env.value, osc1.frequency*0.75)
-        #filt_f = max(self.patch.filt_f * filt_env.value, 0)
 
         filt_amount = self.patch.filt_env_amount
         filt_fmax = 8000   # TODFIXME: put this & filt_fmin somewhere (instrument?)
         filt_mod = filt_amount * filt_fmax * (filt_env.value/2)  # 8k/2 = max freq
         filt_f = min(max(self.patch.filt_f + filt_mod, 60), 8000)
-        filt_q = self.patch.filt_q
-        filt = None
-        if self.patch.filt_type == "LP":
-            filt = self.synth.low_pass_filter( filt_f,filt_q )
-        elif self.patch.filt_type == "HP":
-            filt = self.synth.high_pass_filter( filt_f,filt_q )
-        elif self.patch.filt_type == "BP":
-            filt = self.synth.band_pass_filter( filt_f,filt_q )
-        else:
-            pass  # no filter
-
-        osc1.filter = filt
+        osc1.filter.frequency.scale = filt_f
         if osc2:
-            osc2.filter = filt
+            osc2.filter.frequency.scale = filt_f
 
     def update(self):
         """Update filter envelope and wave-mixing, must be called frequently"""
@@ -183,11 +176,13 @@ class PolyWaveSynth(Instrument):
         filt_env_rate = 1 / filt_env_time  # guaranteed to never be zero
         # use an LFO to fake an Envelope since we can't get envelope.value
         # TODFIXME:: make always positve
-        filt_env = synthio.LFO(once=True, scale=0.9, offset=1.01,
+        filt_env = synthio.LFO(once=True, scale=self.patch.filt_f, offset=0,
                                waveform=filt_env_wave, rate=filt_env_rate)
 
+        filt = synthio.Biquad(self.filter_mode, frequency=filt_env, Q=self.patch.filt_q)
+                              
         f = synthio.midi_to_hz(midi_note)
-        osc1 = synthio.Note( frequency=f, waveform=self.waveform, envelope=amp_env )
+        osc1 = synthio.Note( frequency=f, waveform=self.waveform, envelope=amp_env, filter=filt)
         ## osc2 = None
         ## if self.patch.detune:
         osc2 = synthio.Note(frequency=f * self.patch.detune,

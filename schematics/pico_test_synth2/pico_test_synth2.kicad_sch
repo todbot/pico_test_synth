@@ -4,6 +4,11 @@
 	(generator_version "9.0")
 	(uuid "91d40f58-a363-48c7-98aa-eb2459062304")
 	(paper "A4")
+	(title_block
+		(title "pico_test_synth2")
+		(date "2025-05-15")
+		(company "todbot")
+	)
 	(lib_symbols
 		(symbol "Connector_Audio:AudioJack4"
 			(exclude_from_sim no)
