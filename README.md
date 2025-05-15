@@ -7,12 +7,11 @@ synth to experiment with [`synthio`](https://github.com/todbot/circuitpython-syn
 <a href="https://www.tindie.com/products/todbot/pico_test_synth/?ref=offsite_badges&utm_source=sellers_todbot&utm_medium=badges&utm_campaign=badge_small"><img src="https://d2ss6ovg47m0r5.cloudfront.net/badges/tindie-smalls.png" alt="I sell on Tindie" width="200" height="55"></a>
 
 
-<h3>pico_test_synth2</h3>
+### pico_test_synth2
+<img src="./docs/pico_test_synth2_case1_web.jpg" width=350><img src="./docs/pico_test_synth2_photo1.jpg" width=350>
 
-<img src="./docs/pico_test_synth2_case1_web.jpg" width=400><img src="./docs/pico_test_synth2_photo1.jpg" width=400>
-
-<h3>pico_test_synth, the original</h3>
-<img src="./docs/pico_test_synth_case1_web.jpg" width=400><img src="./docs/pico_test_synth_photo1.jpg" width=400>
+### pico_test_synth, the original
+<img src="./docs/pico_test_synth_case1_web.jpg" width=350><img src="./docs/pico_test_synth_photo1.jpg" width=350>
 
 
 
