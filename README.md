@@ -33,6 +33,18 @@ synth to experiment with [`synthio`](https://github.com/todbot/circuitpython-syn
 * USB MIDI in/out of course too
 * **(NOTE: the pico_test_synth1 PCB will NOT work with the Pico2, since its RP2350 chip has a hardware error)**
 
+
+#### pico_test_synth2 vs pico_test_synth
+
+- Both use the same components
+- Both run the same code 
+- Both fit in the same enclosure
+- `pico_test_synth2` drawn in Kicad, `pico_test_synth` drawn in Eagle
+- `pico_test_synth2` has square buttons, `pico_test_synth` has round buttons
+- `pico_test_synth2` can work with Pico2 with a jumper change and code change
+- `pico_test_synth` can only work with Pico1
+
+
 ### Software
 
 Programs written for [`qtpy_synth`](https://github.com/todbot/qtpy_synth/)
@@ -53,7 +65,8 @@ More code specific for this board coming!
 
 ### Enclosure
 
-As seen in the top photo, there's a very simple [3d-printable enclosure available on Printables](https://www.printables.com/model/784414-case-for-pico_test_synth-circuitpython-synthesizer). You can snap the PCB in to quickly get started,
+As seen in the photos, there is a simple [3d-printable enclosure available on Printables](https://www.printables.com/model/784414-case-for-pico_test_synth-circuitpython-synthesizer). 
+It's fast to print and you can snap the PCB in to quickly get started,
 or use M2.5 screws and nuts to secure the PCB more permanently.
 
 
@@ -72,7 +85,7 @@ The board uses all of the Raspberry Pi Pico pins:
 * `board.GP18` - I2C SDA for OLED display
 * `board.GP17` - TRS UART MIDI in
 * `board.GP16` - TRS UART MIDI out
-* `board.GP0`..`board.GP15` -- touch pads 1-16
+* `board.GP15`..`board.GP0` -- touch pads 1-16
 
 For more details see [`hwtest/code.py`](https://github.com/todbot/pico_test_synth/tree/main/circuitpython/hwtest/code.py).
 
