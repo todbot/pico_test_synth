@@ -25,13 +25,17 @@ class Param:
     def __repr__(self):
         return self.__str__()
 
-    def param_val_for_knob(self, knobval):
+    @property
+    def span(self):
+        return self.vmax - self.vmin
+    
+    def knob_to_val(self, knobval):
         """Knobval ranges 0.0-1.0"""
         return self.vmin + (self.vmax-self.vmin) * knobval
 
     def update(self, new_knob_val):
         """Set a param val with a knob, bounded by the param's min/max attributes"""
-        self.val = self.param_val_for_knob(new_knob_val)
+        self.val = self.knob_to_val(new_knob_val)
         return self.val
 
     def apply_to_obj(self,o):
@@ -44,13 +48,14 @@ class ParamSet:
     especially for the case when there are fewer knobs than Params.
     """
 
-    def __init__(self, params, num_knobs, min_knob_change=0.1):
+    def __init__(self, params, num_knobs, min_knob_change=0.1, knob_smooth=0.5):
         self.params = params
         self.nparams = len(params)
         self.nknobs = num_knobs
         self.min_change = min_knob_change
+        self.smoothing = knob_smooth
         self.nknobsets = self.nparams // self.nknobs
-        self._idx = 0
+        self._idx = 0  # which knobset we're modifying
         self.is_tracking = [False] * self.nknobs
 
     def next_knobset(self):
@@ -59,10 +64,12 @@ class ParamSet:
 
     @property
     def idx(self):
+        """ Which knobset is currently being edited """
         return self._idx
 
     @idx.setter
     def idx(self, i):
+        """ Set which knobset to edit, resets knob tracking """
         if i != self._idx:
             self.is_tracking  = [False] * self.nknobs  # reset tracking
         self._idx = i
@@ -70,21 +77,25 @@ class ParamSet:
     def update_knobs(self, new_knob_vals):
         """new_knob_val is list of new knob vals, each 0.0-1.0"""
         for i in range(self.nknobs):
-            param = self.params[ self._idx * self.nknobsets + i ]
+            param = self.params[ (self._idx * self.nknobs) + i ]
             new_val = param.knob_to_val(new_knob_vals[i])
             if self.is_tracking[i]:
-                param.val = new_val    #update(new_knob_vals[i])
+                param.val = self.smoothing * new_val + (1-self.smoothing) * param.val
             else:
                 delta = param.val - new_val
-                # delta = abs(self.vals[self._idx][i] - new_knob_vals[i])
-                if abs(delta) < self.min_change:
+                if abs(delta) < self.min_change * param.span:
                     self.is_tracking[i] = True
                     param.val = new_val
 
-    def apply_knobset_to_obj(obj):
+    def apply_knobset_to_obj(self, obj):
         """ Apply all vals in a knobset to given object """
         for i in range(self.nknobs):
-            self.param[ self._idx * self.nknobsets + 1].apply_to_obj(obj)
+            self.params[ (self._idx * self.nknobs) + i].apply_to_obj(obj)
+
+    def param_for_name(self, name):
+        for p in filter(lambda p: p.name == name, self.params):
+            return p
+        return None
         
     def __str__(self):
         return("ParamSet(nknobs="+str(self.nknobs) + ", " +

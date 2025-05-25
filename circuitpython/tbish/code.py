@@ -1,32 +1,35 @@
 import time, random
 import ulab.numpy as np
 import synthio
-from synth_setup_pts import  knobA, knobB, keys, mixer, setup_display, setup_touch
+from synth_setup_pts import mixer, knobA, knobB, keys, setup_display, setup_touch
 
-from param import Param
-from knob_tracker import KnobTracker
+from param_set import ParamSet, Param
 
 from tbish_synth import TBishSynth
 from tbish_ui import TBishUI
 
+display = setup_display()
+   
+playing = True
 bpm = 120
 steps_per_beat = 4
+secs_per_step = 60 / bpm / steps_per_beat
 glide_time = 0.25
 midi_notes = [36, 36, 48+7, 36,  48, 48, 36, 48]
 midi_vels = [127, 80, 127, 80,  127, 80, 127, 80]
 new_midi_note = midi_notes[0]
+gate_off_time = 0 
 i=0
 
-# this list of params, arranged in pairs (because there are two knobs)
 params = [
-    Param("cutoff", 8000, 0, 9000, "%4d", 'filt_frequency'),
-    Param('envmod', 0.5,  0.0, 1.0, "%.2f", 'filt_env_depth'), 
+    Param("cutoff", 8000, 0, 9000, "%4d", 'cutoff'),
+    Param('envmod', 0.5,  0.0, 1.0, "%.2f",'envmod'), 
     
-    Param('resonance', 1.8, 0.5, 3.0, "%2.1f", 'resonance'),
-    Param('drive', 0.1, 0.0, 1.0, "%.2f", 'drive'),
+    Param('drive', 20, 5, 30, "%2d", 'drive'),
+    Param('drivemix', 0.5, 0.0, 1.0, "%.2f", 'drive_mix'),
     
-    Param('wave', 0, 0, 1, "%1d", 'wavenum'),
-    Param('drive', 0.1, 0.0, 1.0, "%.2f", 'drive'),    
+    Param("resQ",  1.0, 0.5, 3.5, "%.2f", 'resonance'),
+    Param('decay', 0.5,  0.0, 1.0, "%.2f", ),    
     
     Param('root', 36, 12, 60, "%2d"),
     Param('bpm ', 120, 40, 200, "%3d"),
@@ -36,57 +39,51 @@ params = [
 ]
 
 tb = TBishSynth(mixer.sample_rate, mixer.channel_count)
-tb_audio = tb.add_audioeffects() 
+tb_audio = tb.add_audioeffects()
 mixer.voice[0].play(tb_audio)
 
-display = setup_display()
+param_set = ParamSet(params, num_knobs=2)
 
 tb_disp = TBishUI(display, params)
-
-kt = KnobTracker(num_knobs=2, num_params=8, knob_change_min=0.1*65535)
 
 last_ui_time = time.monotonic()
 def update_ui():
     global last_ui_time
+    ki = tb_disp.curr_param_pair  # shorthand
     if time.monotonic() - last_ui_time > 0.1:
         last_ui_time = time.monotonic()
 
-        kt.update((knobA.value, knobB.value))  # update knobtracker
-        knobAval, knobBval = kt.values
+        param_set.update_knobs((knobA.value/65535, knobB.value/65535))
+
+        param_set.apply_knobset_to_obj(tb)
         
-        ki = kt.idx  #  get which knobset we're on
-        params[ki*2+0].update(knobAval)
-        params[ki*2+1].update(knobBval)
-        
-        params[ki*2+0].apply_to_obj(tb)
-        params[ki*2+1].apply_to_obj(tb)
-        
-        tb_disp.update()
+        tb_disp.update_param_pairs()
         
         #bpm = 40 + 200* (knobB.value/65535)
 
-# these normally live in the sequencer
-secs_per_step = 60 / bpm / steps_per_beat
+
 next_step_time = time.monotonic()
-gate_off_time = 0 
 
 while True:
     update_ui()
     
     if key := keys.events.get():
         if key.pressed:
-            # go to next param set on button press
-            kt.next_knobset()
-            tb_disp.set_param_pair(kt.idx)
-            tb_disp.update()
+            tb_disp.next_param_pair()
+            #tb_disp.update_param_pairs()
+            param_set.idx = tb_disp.curr_param_pair
 
-    # rudimentary sequencer
+    if not playing:
+        continue
+    
     now = time.monotonic()
     if gate_off_time - now <=0:
         tb.note_off(new_midi_note)
-        
-    if next_step_time - now <= 0:
-        next_step_time = now + secs_per_step
+
+    dt = (next_step_time - now)
+    if dt <= 0:
+        next_step_time = now + secs_per_step + dt  
+        # add delta to attempt to make up for display hosing us
         
         #t = secs_per_step/2
         new_midi_note =  midi_notes[i] # + int(24*(knobA.value/65535)) - 12  # new note to glide to

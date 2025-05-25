@@ -14,11 +14,12 @@ wave_vol = 32677
 waves = (
     np.linspace(wave_vol, -wave_vol, num=wave_size, dtype=np.int16),   # saw
     np.concatenate((np.ones(wave_size//2, dtype=np.int16) * wave_vol,  # square
-                    np.ones(wave_size//2, dtype=np.int16) * -wave_vol))
+                    np.ones(wave_size//2, dtype=np.int16) * -wave_vol)),
+    
 )
 
-class TBishSynth(sample_rate, channel_count):
-    def __init__(self, synth):
+class TBishSynth:
+    def __init__(self, sample_rate, channel_count):
         self.synth = synthio.Synthesizer(sample_rate=sample_rate,
                                          channel_count=channel_count)
         self.note = None
@@ -85,12 +86,20 @@ class TBishSynth(sample_rate, channel_count):
 
     @property
     def drive(self):
-        return self.distortion.pre_gain
+        return self.fx_distortion.pre_gain
     
     @drive.setter
     def drive(self,d):
         self.fx_distortion.pre_gain = d
+
+    @property
+    def drive_mix(self):
+        return self.fx_distortion.mix
     
+    @drive_mix.setter
+    def drive_mix(self, m):
+        self.fx_distortion.mix = m
+        
     @property
     def resonance(self):
         return self.filter.Q
