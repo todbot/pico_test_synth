@@ -41,9 +41,9 @@ class Glider:
 
     @property
     def glide_time(self):
-        return 1/self.pos.rate
+        return 1 / self.pos.rate
     
     @glide_time.setter
     def glide_time(self, glide_time):
         glide_time = glide_time or 0.001
-        self.pos.rate = 1/glide_time
+        self.pos.rate = 1 / glide_time

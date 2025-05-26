@@ -1,12 +1,44 @@
 # SPDX-FileCopyrightText: Copyright (c) 2023 Tod Kurt
 # SPDX-License-Identifier: MIT
 """
-`code.py`
+`tbish_synth`
 ================================================================================
 
-TB-303-like synth for CircuitPtyhon synthio. Designed for RP2350 
-
+TB-303-like synth for CircuitPtyhon synthio. Designed for RP2350.
+ 
 12 May 2025 - @todbot / Tod Kurt
+
+Implementation Notes
+--------------------
+
+A TB-303 synth voice has the following attributes:
+
+* VCO: monophonic single-oscillator with either saw or square waveforms,
+  with a "slide" portamento feature that can be enabled per step.
+  The slide time is fixed, traditionally.
+
+* VCF: 24 dB low-pass filter, with adjustable cutoff and adjustable squelchy resonance
+
+* EG: A decay-only envelope generator controls both filter cutoff and amplitude.
+  The EG is retriggered on every step and has no sustain or release
+
+Common post effects added to TB-303 are:
+
+* Overdrive / Distortion
+* Delay, usually tempo-sync'd
+
+The 16-step sequencer of the TB-303 is different than most, having 3 attributes
+per step:
+
+ * pitch value - note pitch of a step
+ * accent on/off - boosts the cutoff, resonance, and VCA level for a step
+ * slide on/off - glides pitch from previous step to current step
+
+This code does not implement the sequencer, but does implement accent and slide
+as special variations to standard MIDI note on/off messages
+
+ * slide - MIDI note is pitch, velocity=1
+ * accent - MIDI note is pitch, velocity=127
 
 """
 # Sorta like a TB303
@@ -39,14 +71,12 @@ class TBishSynth:
         self.cutoff = 8000  # aka 'filter frequency'
         self.envmod = 0.5  # aka 'filter depth'
         self.envdecay = 0.01
-        #self.envelope = synthio.Envelope(attack_time=0.0,
-        #                                 decay_time=self.envdecay,
-        #                                 release_time=0.01)  # FIXME: decay time
+        self.autoslide = True  # FIXME unused yet
         self.filt_env = synthio.LFO(rate=1, scale=self.cutoff, once=True,
                                     waveform=np.array((32767,0),dtype=np.int16))
         self.filter = synthio.Biquad(mode=synthio.FilterMode.LOW_PASS,
                                      frequency=self.filt_env, Q=1.0)
-        self.glider = Glider(0.1, 0)
+        self.glider = Glider(0.0, 0)
  
     def add_audioeffects(self):
         """ Set up the necessary effects chain for TBsynth and
@@ -84,16 +114,20 @@ class TBishSynth:
         self.note_off(midi_note)  # just in case
 
         frate = 1 / self.secs_per_step  # (vel/127) * 5
-        self.glider.glide_time = 0.3 - 0.3 * (vel/127)
-        self.glider.update(midi_note)  # glide up to new note
-        self.filt_env.offset = ((1-self.envmod) * self.cutoff)
-        self.filt_env.scale = self.cutoff - self.filt_env.offset
+        cutoff = self.cutoff * 1.3 if vel>100 else self.cutoff
+        envmod = self.envmod * 0.5 if vel>100 else self.envmod
+        
+        self.filt_env.offset = ((1-envmod) * cutoff) 
+        self.filt_env.scale = cutoff - self.filt_env.offset
         self.filt_env.rate = frate  # 0.75 / self.secs_per_step
         self.filt_env.retrigger()  # must retrigger once-shot LFOs
-        ampenv = synthio.Envelope(attack_time=0.0,
+        self.glider.glide_time = 0.1 if vel==1 else 0.01   # 0.1 - 0.1 * (vel/127)   # FIXME
+        self.glider.update(midi_note)  # glide up to new note
+        ampenv = synthio.Envelope(attack_time=0.001,
+                                  attack_level = 0.8 + 0.2 *(vel/127),
                                   decay_time=self.envdecay,
                                   #sustain_level=0,
-                                  release_time=0.0,) # self.envdecay)  
+                                  release_time=0.01,) # self.envdecay)  
         self.note = synthio.Note(synthio.midi_to_hz(midi_note),
                                  bend = self.glider.lerp,
                                  filter = self.filter,
@@ -120,6 +154,7 @@ class TBishSynth:
     
     @drive.setter
     def drive(self,d):
+        self.fx_distortion.post_gain = -d/2
         self.fx_distortion.pre_gain = d
 
     @property

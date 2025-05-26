@@ -29,9 +29,15 @@ bpm = 120
 steps_per_beat = 4
 secs_per_step = 60 / bpm / steps_per_beat
 glide_time = 0.25
-midi_notes = [36, 36, 48+7, 36,  48, 0, 36, 48]
-midi_vels = [127, 80, 127, 80,  127, 80, 127, 80]
-midi_note = midi_notes[0]
+seqs = [
+    [[36, 36, 48+7, 36,  48, 52, 36, 48],  # notes, 0 = rest
+     [80, 80, 80, 80,  127, 1, 80, 80]],  # vels, 1=slide, 127=accent  
+    [[32, 36, 32, 36,  48, 48, 36, 48],  # notes, 0 = rest
+     [127, 80, 120, 80,  127, 11, 127, 80]],  # vels, 1=slide, 127=accent  
+]
+seq_num = 0
+
+midi_note = seqs[seq_num][0][0]
 next_midi_note = 0
 gate_off_time = 0
 gate_amount = 0.5
@@ -45,11 +51,11 @@ params = [
     Param("resQ",  1.0, 0.5, 3.5, "%.2f", 'resonance'),
     Param('decay', 0.9,  0.0, 1.0, "%.2f", 'decay'),
     
-    Param('drive', 20, 5, 30, "%2d", 'drive'),
+    Param('drive', 20, 5, 40, "%2d", 'drive'),
     Param('drivemix', 0.2, 0.0, 1.0, "%.2f", 'drive_mix'),
         
-    Param('dely', 0.3, 0.0, 1.0, "%.2f"),
-    Param('dtim', 0.25, 0.0, 1.0, "%.2f"),
+    Param('delay', 0.3, 0.0, 1.0, "%.2f"),
+    Param('dtime', 0.25, 0.0, 1.0, "%.2f"),
 ]
 
 touchpad_to_knobset = [1,3,6,8] #,10]
@@ -112,8 +118,8 @@ while True:
     now = time.monotonic()
     if gate_off_time and gate_off_time - now <= 0:
         gate_off_time = 0
-        if next_midi_note != 0:
-            tb.note_off(midi_note)
+        #if next_midi_note != 0:
+        tb.note_off(midi_note)
 
     dt = (next_step_time - now)
     if dt <= 0:
@@ -121,18 +127,21 @@ while True:
         # add dt delta to attempt to make up for display hosing us
         
         #t = secs_per_step/2
-        midi_note =  midi_notes[i]
-        if midi_note != 0:   # 0 means slide
-            midi_note += transpose
-            vel = midi_vels[i] + random.randint(-30,0)
-            tb.secs_per_step = secs_per_step * 1.0
-            tb.note_on(midi_note, vel)
-            gate_off_time = time.monotonic() + secs_per_step * gate_amount
-        i = (i+1) % len(midi_notes)
-        next_midi_note = midi_notes[i]
-        #print("new: %d old: %d glide_time: %.2f vel:%3d" %
-        #      (midi_note, tb.glider.midi_note, tb.glider.glide_time, vel),
-        #      tb.filt_env.offset, tb.filt_env.scale)
+        #midi_note =  midi_notes[i]
+        midi_note = seqs[seq_num][0][i]
+        vel       = seqs[seq_num][1][i]
+        midi_note += transpose
+        gate_amount = param_set.param_for_name('decay').val
+        vel = vel # + random.randint(-30,0)
+        tb.secs_per_step = secs_per_step * 1.0
+        tb.note_on(midi_note, vel)
+        gate_off_time = time.monotonic() + secs_per_step * gate_amount
+        
+        i = (i+1) % len(seqs[seq_num][0])
+        #next_midi_note = midi_notes[i]
+        print(i,"new: %d old: %d glide_time: %.2f vel:%3d" %
+              (midi_note, tb.glider.midi_note, tb.glider.glide_time, vel),
+              tb.filt_env.offset, tb.filt_env.scale)
 
 
 
