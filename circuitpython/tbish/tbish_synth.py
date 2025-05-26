@@ -77,11 +77,14 @@ class TBishSynth:
         self.fx_distortion.play(self.fx_filter2)  # plug 2nd filter into distortion
         self.fx_filter2.play(self.fx_filter1)  # plug 1st filter into 2nd filter
         self.fx_filter1.play(self.synth)   # plug synth into 1st filter
+        #self.fx_delay = ...   # FIXME: add tempo-sync'd delay
         return self.fx_distortion  # this "output" of this synth
 
     def note_on(self, midi_note, vel=127):
-        frate = 1/self.secs_per_step # (vel/127) * 5
-        self.glider.glide_time = 0.3 - 0.3 * (vel/127)   #random.choice( (0, 0.1, 0.2) )
+        self.note_off(midi_note)  # just in case
+
+        frate = 1 / self.secs_per_step  # (vel/127) * 5
+        self.glider.glide_time = 0.3 - 0.3 * (vel/127)
         self.glider.update(midi_note)  # glide up to new note
         self.filt_env.offset = ((1-self.envmod) * self.cutoff)
         self.filt_env.scale = self.cutoff - self.filt_env.offset
@@ -89,7 +92,8 @@ class TBishSynth:
         self.filt_env.retrigger()  # must retrigger once-shot LFOs
         ampenv = synthio.Envelope(attack_time=0.0,
                                   decay_time=self.envdecay,
-                                  release_time=self.envdecay)  # FIXME: decay time
+                                  #sustain_level=0,
+                                  release_time=0.0,) # self.envdecay)  
         self.note = synthio.Note(synthio.midi_to_hz(midi_note),
                                  bend = self.glider.lerp,
                                  filter = self.filter,
@@ -100,6 +104,7 @@ class TBishSynth:
     def note_off(self, midi_note, vel=0):
         if self.note:
             self.synth.release(self.note)
+            self.note = None
 
     @property
     def decay(self):
