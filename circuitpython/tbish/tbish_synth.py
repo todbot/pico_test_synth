@@ -1,3 +1,14 @@
+# SPDX-FileCopyrightText: Copyright (c) 2023 Tod Kurt
+# SPDX-License-Identifier: MIT
+"""
+`code.py`
+================================================================================
+
+TB-303-like synth for CircuitPtyhon synthio. Designed for RP2350 
+
+12 May 2025 - @todbot / Tod Kurt
+
+"""
 # Sorta like a TB303
 import synthio
 import ulab.numpy as np

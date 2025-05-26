@@ -1,3 +1,15 @@
+# SPDX-FileCopyrightText: Copyright (c) 2023 Tod Kurt
+# SPDX-License-Identifier: MIT
+"""
+`code.py`
+================================================================================
+
+This is the main code.py for a TB-like synth
+
+14 May 2025 - @todbot / Tod Kurt
+
+"""
+
 import time, random
 import ulab.numpy as np
 import synthio
@@ -19,9 +31,9 @@ secs_per_step = 60 / bpm / steps_per_beat
 glide_time = 0.25
 midi_notes = [36, 36, 48+7, 36,  48, 48, 36, 48]
 midi_vels = [127, 80, 127, 80,  127, 80, 127, 80]
-transpose = 0
 new_midi_note = midi_notes[0]
 gate_off_time = 0 
+transpose = 0
 i=0
 
 params = [
@@ -38,7 +50,7 @@ params = [
     Param('dtim', 0.25, 0.0, 1.0, "%.2f"),
 ]
 
-touchpad_to_knobset = [1,3,6,8,10]
+touchpad_to_knobset = [1,3,6,8] #,10]
 touchpad_to_transpose = [0,2,4,5,7,9,11,12,14]
     
 tb = TBishSynth(mixer.sample_rate, mixer.channel_count)
@@ -49,6 +61,11 @@ param_set = ParamSet(params, num_knobs=2)
 param_set.apply_params(tb)  # set up synth with param set
 
 tb_disp = TBishUI(display, params)
+
+print("="*80)
+print("tbish synth! press button to start")
+print("="*80)
+
 
 last_ui_time = time.monotonic()
 def update_ui():
@@ -62,11 +79,10 @@ def update_ui():
         param_set.apply_knobset(tb)  # set synth with params
         
         tb_disp.update_param_pairs()
-        
+
 next_step_time = time.monotonic()
 
 while True:
-    update_ui()
     
     if key := keys.events.get():
         if key.pressed:
@@ -84,12 +100,13 @@ while True:
                 if touch.key_number in touchpad_to_transpose:
                     transpose = touch.key_number   # chromatic
                     
+    update_ui()
 
     if not playing:
         continue
     
     now = time.monotonic()
-    if gate_off_time - now <=0:
+    if gate_off_time - now <= 0:
         tb.note_off(new_midi_note)
 
     dt = (next_step_time - now)
@@ -107,7 +124,6 @@ while True:
         print("new: %d old: %d glide_time: %.2f vel:%3d" %
               (new_midi_note, tb.glider.midi_note, tb.glider.glide_time, vel),
               tb.filt_env.offset, tb.filt_env.scale)
-    
 
 
 

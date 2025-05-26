@@ -1,4 +1,15 @@
-# pitch_glider.py -- Portamento tool for synthio.Note
+# SPDX-FileCopyrightText: Copyright (c) 2023 Tod Kurt
+# SPDX-License-Identifier: MIT
+"""
+`pitch_glider.py`
+================================================================================
+
+Portamento tool for synthio.Note
+
+10 Feb 2025 - @todbot / Tod Kurt
+
+"""
+# pitch_glider.py --
 # part of todbot circuitpython synthio tutorial
 # 10 Feb 2025 - @todbot / Tod Kurt
 
@@ -31,6 +42,7 @@ class Glider:
     @property
     def glide_time(self):
         return 1/self.pos.rate
+    
     @glide_time.setter
     def glide_time(self, glide_time):
         glide_time = glide_time or 0.001

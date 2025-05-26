@@ -1,4 +1,20 @@
 # pylint: disable=too-many-arguments, too-many-positional-arguments
+# SPDX-FileCopyrightText: Copyright (c) 2023 Tod Kurt
+# SPDX-License-Identifier: MIT
+"""
+`param_set.py`
+================================================================================
+
+`ParamSet` is a collection of `Param` that track normalized knob positions,
+    especially for the case when there are fewer knobs than `Param`s.
+
+`Param`s are a UI- and implementation-independent way of describing
+    a named numerical parameter with a min/max, a display format, and
+    (optionally) an object attribute that they represent.
+
+20 May 2025 - @todbot / Tod Kurt
+
+"""
 
 KNOB_MODE_PICKUP = 0
 KNOB_MODE_SCALE = 1
