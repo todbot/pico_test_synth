@@ -37,10 +37,9 @@ class TBishUI(displayio.Group):
 
     def next_param_pair(self):
         self.curr_param_pair = (self.curr_param_pair+1) % self.num_param_pairs
-        self.rect.x = 45 + 5*(self.curr_param_pair)
-        #self.rect.y = 5 + 10*(self.curr_param_pair)
         
     def update_param_pairs(self):
+        self.rect.x = 45 + 5*(self.curr_param_pair)
         paramL = self.params[self.curr_param_pair*2+0]
         paramR = self.params[self.curr_param_pair*2+1]
         self.labelA.text = paramL.name

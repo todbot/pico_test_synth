@@ -34,7 +34,9 @@ touch_pins = (
 audio = audiobusio.I2SOut(bit_clock=i2s_bck_pin, word_select=i2s_lck_pin, data=i2s_dat_pin)
 
 # add a mixer to give us a buffer
-mixer = audiomixer.Mixer(sample_rate=SAMPLE_RATE, channel_count=CHANNEL_COUNT, buffer_size=BUFFER_SIZE)
+mixer = audiomixer.Mixer(sample_rate=SAMPLE_RATE,
+                         channel_count=CHANNEL_COUNT,
+                         buffer_size=BUFFER_SIZE)
 
 # make the actual synthesizer
 synth = synthio.Synthesizer(sample_rate=SAMPLE_RATE, channel_count=CHANNEL_COUNT)
@@ -76,14 +78,31 @@ def setup_display():
     return display
 
 touchins = []
+touches = []
+
 def setup_touch():
+    global touchins, touches
     import os
     import digitalio
     import touchio
+    from adafruit_debouncer import Debouncer
     is_rp2350 = 'rp2350' in os.uname()[0]
     pull_type = None if not is_rp2350 else digitalio.Pull.UP
     for pin in touch_pins:
         touchin = touchio.TouchIn(pin, pull_type)
         touchin.threshold = int(touchin.threshold * 1.1)
         touchins.append(touchin)
-    return touchins
+        touches.append(Debouncer(touchin))
+    return touches
+
+def check_touch():
+    """Check the touch inputs, return keypad-like Events"""
+    events = []
+    for i,touch in enumerate(touches):
+        touch.update()
+        if touch.rose:
+            events.append(keypad.Event(i,True))
+        elif touch.fell:
+            events.append(keypad.Event(i,False))
+    return events
+

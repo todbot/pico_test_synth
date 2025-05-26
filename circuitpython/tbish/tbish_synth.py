@@ -27,7 +27,10 @@ class TBishSynth:
         self.wavenum = 1   # which waveform to use: saw=0, square=1
         self.cutoff = 8000  # aka 'filter frequency'
         self.envmod = 0.5  # aka 'filter depth'
-        self.envelope = synthio.Envelope(attack_time=0.0, release_time=0.01)  # FIXME: decay time
+        self.envdecay = 0.01
+        #self.envelope = synthio.Envelope(attack_time=0.0,
+        #                                 decay_time=self.envdecay,
+        #                                 release_time=0.01)  # FIXME: decay time
         self.filt_env = synthio.LFO(rate=1, scale=self.cutoff, once=True,
                                     waveform=np.array((32767,0),dtype=np.int16))
         self.filter = synthio.Biquad(mode=synthio.FilterMode.LOW_PASS,
@@ -73,10 +76,13 @@ class TBishSynth:
         self.filt_env.scale = self.cutoff - self.filt_env.offset
         self.filt_env.rate = frate  # 0.75 / self.secs_per_step
         self.filt_env.retrigger()  # must retrigger once-shot LFOs
+        ampenv = synthio.Envelope(attack_time=0.0,
+                                  decay_time=self.envdecay,
+                                  release_time=self.envdecay)  # FIXME: decay time
         self.note = synthio.Note(synthio.midi_to_hz(midi_note),
                                  bend = self.glider.lerp,
                                  filter = self.filter,
-                                 envelope = self.envelope,
+                                 envelope = ampenv,
                                  waveform = waves[self.wavenum])
         self.synth.press(self.note)
 
@@ -84,6 +90,14 @@ class TBishSynth:
         if self.note:
             self.synth.release(self.note)
 
+    @property
+    def decay(self):
+        return self.envdecay
+    
+    @decay.setter
+    def decay(self,t):
+        self.envdecay = t
+        
     @property
     def drive(self):
         return self.fx_distortion.pre_gain

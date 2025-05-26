@@ -87,7 +87,12 @@ class ParamSet:
                     self.is_tracking[i] = True
                     param.val = new_val
 
-    def apply_knobset_to_obj(self, obj):
+    def apply_params(self, obj):
+        """ Apply all params to given object """
+        for i in range(self.nparams):
+            self.params[i].apply_to_obj(obj)
+            
+    def apply_knobset(self, obj):
         """ Apply all vals in a knobset to given object """
         for i in range(self.nknobs):
             self.params[ (self._idx * self.nknobs) + i].apply_to_obj(obj)
