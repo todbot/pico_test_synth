@@ -34,11 +34,8 @@ per step:
  * accent on/off - boosts the cutoff, resonance, and VCA level for a step
  * slide on/off - glides pitch from previous step to current step
 
-This code does not implement the sequencer, but does implement accent and slide
-as special variations to standard MIDI note on/off messages
+This code does not implement the sequencer, but does implement accent and slide.
 
- * slide - MIDI note is pitch, velocity=1
- * accent - MIDI note is pitch, velocity=127
 
 """
 # Sorta like a TB303
@@ -47,6 +44,7 @@ import ulab.numpy as np
 try:
     import audiofilters
     from audiofilters import Distortion, Filter
+    import audiodelays
 except (ImportError, NameError):
     pass
 
@@ -66,7 +64,7 @@ class TBishSynth:
         self.synth = synthio.Synthesizer(sample_rate=sample_rate,
                                          channel_count=channel_count)
         self.note = None
-        self.secs_per_step = 0.1
+        self.secs_per_step = 0.125
         self.wavenum = 1   # which waveform to use: saw=0, square=1
         self.cutoff = 8000  # aka 'filter frequency'
         self.envmod = 0.5  # aka 'filter depth'
@@ -104,28 +102,47 @@ class TBishSynth:
                                                 frequency=self.filt_env,
                                                 Q=self.resonance)
 
+        self.fx_delay = audiodelays.Echo(**fxcfg, mix=0.0,
+                                         max_delay_ms = 400,
+                                         delay_ms = self.secs_per_step * 1000 * 2,
+                                         decay = 0.1,
+                                         freq_shift = False,
+                                         )
+        print("delay_ms=", self.secs_per_step * 1000 * 4)
+        #self.fx_delay = ...   # FIXME: add tempo-sync'd delay
+        self.fx_delay.play(self.fx_distortion)
         self.fx_distortion.play(self.fx_filter2)  # plug 2nd filter into distortion
         self.fx_filter2.play(self.fx_filter1)  # plug 1st filter into 2nd filter
         self.fx_filter1.play(self.synth)   # plug synth into 1st filter
-        #self.fx_delay = ...   # FIXME: add tempo-sync'd delay
-        return self.fx_distortion  # this "output" of this synth
+        #return self.fx_distortion  # this "output" of this synth
+        return self.fx_delay
 
+    def note_on_step(self, midi_note, slide=False, accent=False):
+        print("note_on_step:", midi_note, slide, accent)
+        pass
+    
     def note_on(self, midi_note, vel=127):
+        """
+        Trigger a note. 'vel' has special meaning.
+        vel = 1 : slide, not new not
+        vel = 127 : accent
+        """
         self.note_off(midi_note)  # just in case
 
-        frate = 1 / self.secs_per_step  # (vel/127) * 5
-        cutoff = self.cutoff * 1.3 if vel>100 else self.cutoff
-        envmod = self.envmod * 0.5 if vel>100 else self.envmod
+        frate = 1 / self.secs_per_step 
+        cutoff = self.cutoff * 1.3 if vel==127 else self.cutoff  # FIXME verify
+        envmod = self.envmod * 0.5 if vel==127 else self.envmod
         
         self.filt_env.offset = ((1-envmod) * cutoff) 
         self.filt_env.scale = cutoff - self.filt_env.offset
-        self.filt_env.rate = frate  # 0.75 / self.secs_per_step
+        self.filt_env.rate = frate  
         self.filt_env.retrigger()  # must retrigger once-shot LFOs
-        self.glider.glide_time = 0.1 if vel==1 else 0.01   # 0.1 - 0.1 * (vel/127)   # FIXME
+        self.glider.glide_time = 0.1 if vel==1 else 0.001  # slide or minimal slide
         self.glider.update(midi_note)  # glide up to new note
         ampenv = synthio.Envelope(attack_time=0.001,
-                                  attack_level = 0.8 + 0.2 *(vel/127),
-                                  decay_time=self.envdecay,
+                                  attack_level = 0.8 if vel != 127 else 1.0,
+                                  #decay_time = self.envdecay,
+                                  decay_time = frate, 
                                   #sustain_level=0,
                                   release_time=0.01,) # self.envdecay)  
         self.note = synthio.Note(synthio.midi_to_hz(midi_note),
