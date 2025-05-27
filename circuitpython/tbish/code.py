@@ -26,21 +26,23 @@ touches = setup_touch()
 
 playing = True
 bpm = 120
-steps_per_beat = 4
+steps_per_beat = 2
 secs_per_step = 60 / bpm / steps_per_beat
 glide_time = 0.25
 seqs = [
     [[36, 36, 48, 36,  48, 48+7, 36, 48],  # notes, 0 = rest
-     [127, 80, 80, 80,  127, 1, 30, 1]],  # vels, 1=slide, 127=accent  
-    [[34, 36, 34, 36,  48, 48, 36, 48],  # notes, 0 = rest
-     [127, 80, 120, 80,  127, 11, 127, 80]],  # vels, 1=slide, 127=accent  
+     [127, 80, 80, 80,  127, 1, 30, 1]],   # vels, 1=slide, 127=accent  
+    [[34, 36, 34, 36,  48, 48, 36, 48],    # notes, 0 = rest
+     [127, 80, 120, 80,  127, 11, 127, 80]],  # vels 127=accent  
+    [[36, 36+12, 36, 36+12,  36, 0, 36, 0],    # notes, 0 = rest
+     [127, 80, 120, 80,  127, 80, 127, 80]],  # vels 127=accent  
 ]
 seq_num = 0
 
 midi_note = seqs[seq_num][0][0]
 next_midi_note = 0
 gate_off_time = 0
-gate_amount = 0.5
+gate_amount = 0.75  # TB-303 historical gate lengnth
 transpose = 0
 i=0
 
@@ -49,7 +51,7 @@ params = [
     Param('envmod', 0.5,  0.0, 1.0, "%.2f",'envmod'), 
     
     Param("resQ",  1.0, 0.5, 4.0, "%.2f", 'resonance'),
-    Param('gate', 0.9,  0.0, 1.0, "%.2f"), #  'decay'),
+    Param('decay', 0.5,  0.0, 1.0, "%.2f", 'decay'),
     
     Param('drive', 20, 5, 40, "%2d", 'drive'),
     Param('drivemix', 0.2, 0.0, 1.0, "%.2f", 'drive_mix'),
@@ -95,7 +97,7 @@ def update_ui():
         param_set.apply_knobset(tb) 
         
         # for non-tb params
-        gate_amount = param_set.param_for_name('gate').val
+        #gate_amount = param_set.param_for_name('gate').val
         bpm = param_set.param_for_name('bpm').val
         secs_per_step = 60 / bpm / steps_per_beat
 
@@ -141,12 +143,13 @@ while True:
 
         midi_note = seqs[seq_num][0][i]
         vel       = seqs[seq_num][1][i]
-        midi_note += transpose
-        vel = vel  # + random.randint(-30,0)
-        tb.secs_per_step = secs_per_step * 1.0
-        tb.note_on(midi_note, vel)
-        #tb.note_on(midi_note, True, False)
-        gate_off_time = time.monotonic() + secs_per_step * gate_amount
+        if midi_note != 0:
+            midi_note += transpose
+            vel = vel  # + random.randint(-30,0)
+            tb.secs_per_step = secs_per_step * 1.0
+            tb.note_on(midi_note, vel)
+            #tb.note_on(midi_note, True, False)
+            gate_off_time = time.monotonic() + secs_per_step * gate_amount
 
         seq_num = int(param_set.param_for_name('seq').val)
         i = (i+1) % len(seqs[seq_num][0])

@@ -129,21 +129,23 @@ class TBishSynth:
         """
         self.note_off(midi_note)  # just in case
 
-        frate = 1 / self.secs_per_step 
+        #frate = 1 / self.secs_per_step
+        envdecay = max(0.05, self.secs_per_step * self.envdecay)
+        frate = 1 / envdecay
         cutoff = self.cutoff * 1.3 if vel==127 else self.cutoff  # FIXME verify
         envmod = self.envmod * 0.5 if vel==127 else self.envmod
         
         self.filt_env.offset = ((1-envmod) * cutoff) 
         self.filt_env.scale = cutoff - self.filt_env.offset
-        self.filt_env.rate = frate  
+        self.filt_env.rate = frate
         self.filt_env.retrigger()  # must retrigger once-shot LFOs
         self.glider.glide_time = 0.1 if vel==1 else 0.001  # slide or minimal slide
         self.glider.update(midi_note)  # glide up to new note
         ampenv = synthio.Envelope(attack_time=0.001,
                                   attack_level = 0.8 if vel != 127 else 1.0,
-                                  #decay_time = self.envdecay,
-                                  decay_time = frate, 
-                                  #sustain_level=0,
+                                  decay_time = envdecay,
+                                  #decay_time = frate, 
+                                  sustain_level=0,
                                   release_time=0.01,) # self.envdecay)  
         self.note = synthio.Note(synthio.midi_to_hz(midi_note),
                                  bend = self.glider.lerp,
