@@ -69,6 +69,7 @@ class TBishSynth:
         self.cutoff = 8000  # aka 'filter frequency'
         self.envmod = 0.5  # aka 'filter depth'
         self.envdecay = 0.01
+        self._accent = 0.5
         self.autoslide = True  # FIXME unused yet
         self.filt_env = synthio.LFO(rate=1, scale=self.cutoff, once=True,
                                     waveform=np.array((32767,0),dtype=np.int16))
@@ -108,14 +109,12 @@ class TBishSynth:
                                          decay = 0.1,
                                          freq_shift = False,
                                          )
-        print("delay_ms=", self.secs_per_step * 1000 * 4)
-        #self.fx_delay = ...   # FIXME: add tempo-sync'd delay
         self.fx_delay.play(self.fx_distortion)
         self.fx_distortion.play(self.fx_filter2)  # plug 2nd filter into distortion
         self.fx_filter2.play(self.fx_filter1)  # plug 1st filter into 2nd filter
         self.fx_filter1.play(self.synth)   # plug synth into 1st filter
-        #return self.fx_distortion  # this "output" of this synth
-        return self.fx_delay
+        #return self.fx_distortion  # the "output" of this synth
+        return self.fx_delay   # the "output" of this synth
 
     def note_on_step(self, midi_note, slide=False, accent=False):
         print("note_on_step:", midi_note, slide, accent)
@@ -130,7 +129,7 @@ class TBishSynth:
         self.note_off(midi_note)  # just in case
 
         #frate = 1 / self.secs_per_step
-        envdecay = max(0.05, self.secs_per_step * self.envdecay)
+        envdecay = max(0.05, self.secs_per_step * self.envdecay * 1.5)  # 1.5 fudge 
         frate = 1 / envdecay
         cutoff = self.cutoff * 1.3 if vel==127 else self.cutoff  # FIXME verify
         envmod = self.envmod * 0.5 if vel==127 else self.envmod
@@ -166,6 +165,14 @@ class TBishSynth:
     @decay.setter
     def decay(self,t):
         self.envdecay = t
+        
+    @property
+    def accent(self):
+        return self.accent
+    
+    @accent.setter
+    def accent(self, v):
+        self.accent = v
         
     @property
     def drive(self):

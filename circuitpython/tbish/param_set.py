@@ -64,7 +64,7 @@ class ParamSet:
     especially for the case when there are fewer knobs than Params.
     """
 
-    def __init__(self, params, num_knobs, min_knob_change=0.1, knob_smooth=0.5):
+    def __init__(self, params, num_knobs, min_knob_change=0.05, knob_smooth=0.5):
         self.params = params
         self.nparams = len(params)
         self.nknobs = num_knobs

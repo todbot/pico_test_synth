@@ -42,10 +42,16 @@ class TBishUI(displayio.Group):
         self.rect.x = 45 + 5*(self.curr_param_pair)
         paramL = self.params[self.curr_param_pair*2+0]
         paramR = self.params[self.curr_param_pair*2+1]
-        self.labelA.text = paramL.name
-        self.labelB.text = paramR.name
-        self.textA.text = paramL.fmt % paramL.val
-        self.textB.text = paramR.fmt % paramR.val
-        #print("refreshing")
+        textAnew = paramL.fmt % paramL.val
+        textBnew = paramR.fmt % paramR.val
+        # try to be smart and only update what's needed
+        if paramL.name != self.labelA.text:
+            self.labelA.text = paramL.name
+        if paramR.name != self.labelB.text:
+            self.labelB.text = paramR.name
+        if self.textA.text != textAnew:
+            self.textA.text = textAnew
+        if self.textB.text != textBnew:
+            self.textB.text = textBnew
         self.display.refresh()
         
