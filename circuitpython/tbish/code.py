@@ -28,8 +28,8 @@ from tbish_ui import TBishUI
 display = setup_display()
 touches = setup_touch()
 
-bpm = 180
-steps_per_beat = 2   # 4 = 16th note, 2 = 8th note, 1 = quarter note
+bpm = 120
+steps_per_beat = 4   # 4 = 16th note, 2 = 8th note, 1 = quarter note
 
 seqs = [
     [[36, 36, 48, 36,  48, 48+7, 36, 48],  # notes, 0 = rest
@@ -56,18 +56,21 @@ params = [
     Param("resQ",  1.0, 0.5, 4.0, "%.2f", 'resonance'),
     Param('decay', 0.75,  0.0, 1.0, "%.2f", 'decay'),
     
-    Param('drive', 320, 5, 40, "%2d", 'drive'),
+    Param('drive', 30, 5, 40, "%2d", 'drive'),
     Param('drivemix', 0.2, 0.0, 1.0, "%.2f", 'drive_mix'),
         
     Param('delay', 0.0, 0.0, 1.0, "%.2f", 'delay_mix'),
     Param('dtime', 0.25, 0.0, 1.0, "%.2f", 'delay_time'),
 
     Param('seq', 0, 0, len(seqs), "%1d"),
+    Param('transpose', 0, -13, 13, "%2d", 'transpose'),
+
+    Param('wave', 1, 0, 2, "%1d", 'wavenum'),
     Param('bpm', bpm, 40, 200, "%3d"),
     
 ]
 
-touchpad_to_knobset = [1,3,6,8,10] # ,13]
+touchpad_to_knobset = [1,3,6,8,10,13]
 touchpad_to_transpose = [0,2,4,5,7,9,11,12,14]
     
 tb = TBishSynth(mixer.sample_rate, mixer.channel_count)

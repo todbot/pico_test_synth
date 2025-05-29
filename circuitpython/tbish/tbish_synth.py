@@ -22,11 +22,6 @@ A TB-303 synth voice has the following attributes:
 * EG: A decay-only envelope generator controls both filter cutoff and amplitude.
   The EG is retriggered on every step and has no sustain or release
 
-Common post effects added to TB-303 are:
-
-* Overdrive / Distortion
-* Delay, usually tempo-sync'd
-
 The 16-step sequencer of the TB-303 is different than most, having 3 attributes
 per step:
 
@@ -36,6 +31,12 @@ per step:
 
 This code does not implement the sequencer, but does implement accent and slide.
 
+Common post effects added to TB-303 are:
+
+* Overdrive / Distortion
+* Delay, usually tempo-sync'd
+
+Both of these effects are added to this synth.
 
 """
 # Sorta like a TB303
@@ -56,7 +57,6 @@ waves = (
     np.linspace(wave_vol, -wave_vol, num=wave_size, dtype=np.int16),   # saw
     np.concatenate((np.ones(wave_size//2, dtype=np.int16) * wave_vol,  # square
                     np.ones(wave_size//2, dtype=np.int16) * -wave_vol)),
-    
 )
 
 class TBishSynth:
@@ -64,12 +64,13 @@ class TBishSynth:
         self.synth = synthio.Synthesizer(sample_rate=sample_rate,
                                          channel_count=channel_count)
         self.note = None
-        self.secs_per_step = 0.125
+        self.secs_per_step = 0.125  # fixme
+        self.transpose = 0
         self.wavenum = 1   # which waveform to use: saw=0, square=1
         self.cutoff = 8000  # aka 'filter frequency'
         self.envmod = 0.5  # aka 'filter depth'
-        self.envdecay = 0.01
-        self._accent = 0.5
+        self.decay = 0.01
+        self.accent = 0.5
         self.autoslide = True  # FIXME unused yet
         self.filt_env = synthio.LFO(rate=1, scale=self.cutoff, once=True,
                                     waveform=np.array((32767,0),dtype=np.int16))
@@ -119,6 +120,7 @@ class TBishSynth:
         return self.fx_delay   # the "output" of this synth
 
     def note_on_step(self, midi_note, slide=False, accent=False):
+        """Trigger a note, with slide and accent"""
         print("note_on_step: %3d %1d %1d" % (midi_note, slide, accent))
         self.note_off(midi_note) # must do when in step mode
         attack_level = 0.8
@@ -134,7 +136,7 @@ class TBishSynth:
         if slide:
             glide_time = 0.1
             # FIXME also do appropriate other actions for slide
-        envdecay = max(0.05, self.secs_per_step * self.envdecay * 1.5)  # 1.5 fudge 
+        envdecay = max(0.05, self.secs_per_step * self.decay * 1.5)  # FIXME: 1.5 fudge 
         frate = 1 / envdecay
         self.filt_env.offset = ((1-envmod) * cutoff) 
         self.filt_env.scale = cutoff - self.filt_env.offset
@@ -147,11 +149,11 @@ class TBishSynth:
                                   decay_time = envdecay,
                                   sustain_level=0,
                                   release_time=0.01) 
-        self.note = synthio.Note(synthio.midi_to_hz(midi_note),
+        self.note = synthio.Note(synthio.midi_to_hz(midi_note+self.transpose),
                                  bend = self.glider.lerp,
                                  filter = self.filter,
                                  envelope = ampenv,
-                                 waveform = waves[self.wavenum])
+                                 waveform = waves[int(self.wavenum)])
         self.synth.press(self.note)
         
 
@@ -160,27 +162,11 @@ class TBishSynth:
         self.note_on_step(midi_note, slide=(vel==1), accent=(vel==127))
 
     def note_off(self, midi_note, vel=0):
-        """Used for both MIDI and sequencer mode"""
+        """Used for both MIDI and sequencer mode, passed in args are not used."""
         if self.note:
             self.synth.release(self.note)
             self.note = None
 
-    @property
-    def decay(self):
-        return self.envdecay
-    
-    @decay.setter
-    def decay(self,t):
-        self.envdecay = t
-        
-    @property
-    def accent(self):
-        return self.accent
-    
-    @accent.setter
-    def accent(self, v):
-        self.accent = v
-        
     @property
     def resonance(self):
         return self.filter.Q
@@ -202,6 +188,14 @@ class TBishSynth:
         self.fx_distortion.pre_gain = d
 
     @property
+    def drive_mix(self):
+        return self.fx_distortion.mix
+    
+    @drive_mix.setter
+    def drive_mix(self, m):
+        self.fx_distortion.mix = m
+        
+    @property
     def delay_mix(self):
         return self.fx_delay.mix
     
@@ -211,8 +205,8 @@ class TBishSynth:
         
     @property
     def delay_time(self):
-        return self.fx_delay.delay_ms / (self.secs_per_step * 100 * 2)
+        return self.fx_delay.delay_ms / (self.secs_per_step * 100 * 4)
     
     @delay_time.setter
     def delay_time(self, m):
-        self.fx_delay.delay_ms = self.secs_per_step * 1000 * 2 * m
+        self.fx_delay.delay_ms = self.secs_per_step * 1000 * 4 * m
