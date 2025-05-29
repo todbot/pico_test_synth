@@ -28,6 +28,9 @@ from tbish_ui import TBishUI
 display = setup_display()
 touches = setup_touch()
 
+bpm = 180
+steps_per_beat = 2   # 4 = 16th note, 2 = 8th note, 1 = quarter note
+
 seqs = [
     [[36, 36, 48, 36,  48, 48+7, 36, 48],  # notes, 0 = rest
      [127, 80, 80, 80,  127, 1, 30, 1]],   # vels, 1=slide, 127=accent
@@ -46,20 +49,22 @@ seqs_steps = [
 ]    
 
 params = [
-    Param("cutoff", 4000, 200, 6000, "%4d", 'cutoff'),
+    #      name     val,  min,   max, str,  tb.attr name
+    Param("cutoff", 4000, 100, 6000, "%4d", 'cutoff'),
     Param('envmod', 0.5,  0.0, 1.0, "%.2f",'envmod'), 
     
     Param("resQ",  1.0, 0.5, 4.0, "%.2f", 'resonance'),
-    Param('decay', 0.5,  0.0, 1.0, "%.2f", 'decay'),
+    Param('decay', 0.75,  0.0, 1.0, "%.2f", 'decay'),
     
-    Param('drive', 20, 5, 40, "%2d", 'drive'),
+    Param('drive', 320, 5, 40, "%2d", 'drive'),
     Param('drivemix', 0.2, 0.0, 1.0, "%.2f", 'drive_mix'),
         
-    Param('delay', 0.3, 0.0, 1.0, "%.2f"),
-    Param('dtime', 0.25, 0.0, 1.0, "%.2f"),
+    Param('delay', 0.0, 0.0, 1.0, "%.2f", 'delay_mix'),
+    Param('dtime', 0.25, 0.0, 1.0, "%.2f", 'delay_time'),
 
     Param('seq', 0, 0, len(seqs), "%1d"),
-    Param('bpm', 120, 40, 200, "%3d"),
+    Param('bpm', bpm, 40, 200, "%3d"),
+    
 ]
 
 touchpad_to_knobset = [1,3,6,8,10] # ,13]
@@ -70,8 +75,10 @@ tb_audio = tb.add_audioeffects()
 mixer.voice[0].play(tb_audio)
 
 sequencer = TBishSequencer(tb, seqs)
+sequencer.bpm = bpm
+sequencer.steps_per_beat = steps_per_beat
 
-param_set = ParamSet(params, num_knobs=2)
+param_set = ParamSet(params, num_knobs=2, knob_smooth=0.125)
 param_set.apply_params(tb)  # set up synth with param set
 
 tb_disp = TBishUI(display, params)
@@ -87,7 +94,8 @@ last_ui_time = time.monotonic()
 def update_ui():
     global last_ui_time
     ki = tb_disp.curr_param_pair  # shorthand
-    if time.monotonic() - last_ui_time > 0.05:
+    #if time.monotonic() - last_ui_time > 0.05:  # every 50 millis
+    if time.monotonic() - last_ui_time > 0.01:  # every 10 millis
         last_ui_time = time.monotonic()
 
         # bit-reduction filtering then normalize
@@ -95,6 +103,7 @@ def update_ui():
         #knobvals = [((k>>8)<<8)/65535 for k in knobvals]
         # just normalized
         knobvals = (knobA.value/65535, knobB.value/65535)
+        #print(knobvals, time.monotonic())
         param_set.update_knobs(knobvals)
 
         # set synth with params
@@ -118,6 +127,11 @@ while True:
         if key.pressed:
             if sequencer.playing:
                 sequencer.stop()
+                # testing out save/load params
+                s = ParamSet.dump(param_set)
+                print(s)
+                ParamSet.load(s)
+                
             else:
                 sequencer.start()
 

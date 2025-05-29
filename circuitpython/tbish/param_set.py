@@ -16,6 +16,8 @@
 
 """
 
+import json
+
 KNOB_MODE_PICKUP = 0
 KNOB_MODE_SCALE = 1
 KNOB_MODE_RELATIVE = 2
@@ -26,17 +28,19 @@ class Param:
     (optionally) an object attribute that they represent.
     """
 
-    def __init__(self, name, val, min_val, max_val, fmt, objattr=None):
+    def __init__(self, name, val, vmin, vmax, fmt, objattr=None):
         self.name = name
         self.val = val
-        self.vmin = min_val
-        self.vmax = max_val
+        self.vmin = vmin
+        self.vmax = vmax
         self.fmt = fmt
         self.objattr = objattr
 
     def __str__(self):
+        obstr = 'None' if self.objattr is None else "'%s'" % self.objattr
         return("Param('" + self.name + "'," + str(self.val) + "," +
-               str(self.vmin) + "," + str(self.vmax) + ",'" + str(self.fmt) + "')")
+               str(self.vmin) + "," + str(self.vmax) + ",'" + str(self.fmt) +
+               "'," + obstr + ")")
 
     def __repr__(self):
         return self.__str__()
@@ -101,7 +105,7 @@ class ParamSet:
                 delta = param.val - new_val
                 if abs(delta) < self.min_change * param.span:
                     self.is_tracking[i] = True
-                    param.val = new_val
+                    #param.val = new_val
 
     def apply_params(self, obj):
         """ Apply all params to given object """
@@ -117,12 +121,25 @@ class ParamSet:
         for p in filter(lambda p: p.name == name, self.params):
             return p
         return None
-        
+
     def __str__(self):
         return("ParamSet(nknobs="+str(self.nknobs) + ", " +
                "nknobsets="+str(self.nknobsets) +
                ", params="+str(self.params)+")")
 
+    @staticmethod
+    def load(dumpstr):
+        dumpobj = json.loads(dumpstr)
+        newparams = [Param(**d) for d in dumpobj['params']]
+        return newparams
+    
+    @staticmethod
+    def dump(paramset):
+        dumpobj = {
+            'params': [p.__dict__ for p in paramset.params]
+            }
+        return json.dumps(dumpobj)
+        
 # simple test
 
 if __name__ == "__main__":

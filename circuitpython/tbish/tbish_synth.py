@@ -86,11 +86,13 @@ class TBishSynth:
         
         # No distortion on rp2040 (not enough CPU)
         self.fx_distortion = Distortion(**fxcfg, mix = 0.0,
-                                        # other distortion modes are too slow? 
                                         mode = audiofilters.DistortionMode.LOFI,
+                                        # other distortion modes are too slow? 
+                                        #mode = audiofilters.DistortionMode.OVERDRIVE,
                                         soft_clip = True,
                                         pre_gain = 30,
                                         post_gain = -10)
+        
         # but yes filter on rp2040 with custom compile
         self.fx_filter1 = Filter(**fxcfg, mix=1.0)
         self.fx_filter2 = Filter(**fxcfg, mix=1.0)
@@ -117,43 +119,48 @@ class TBishSynth:
         return self.fx_delay   # the "output" of this synth
 
     def note_on_step(self, midi_note, slide=False, accent=False):
-        print("note_on_step:", midi_note, slide, accent)
-        pass
-    
-    def note_on(self, midi_note, vel=127):
-        """
-        Trigger a note. 'vel' has special meaning.
-        vel = 1 : slide, not new not
-        vel = 127 : accent
-        """
-        self.note_off(midi_note)  # just in case
-
-        #frate = 1 / self.secs_per_step
+        print("note_on_step: %3d %1d %1d" % (midi_note, slide, accent))
+        self.note_off(midi_note) # must do when in step mode
+        attack_level = 0.8
+        cutoff = self.cutoff
+        # resonance = self.resonance  # fixme how to do this
+        envmod = self.envmod
+        glide_time = 0.001  # minimal slide
+        if accent:
+            attack_level +=  0.2 
+            cutoff *= 1.3   # FIXME: verify
+            #resonance *= 1.3
+            envmod *= 0.5
+        if slide:
+            glide_time = 0.1
+            # FIXME also do appropriate other actions for slide
         envdecay = max(0.05, self.secs_per_step * self.envdecay * 1.5)  # 1.5 fudge 
         frate = 1 / envdecay
-        cutoff = self.cutoff * 1.3 if vel==127 else self.cutoff  # FIXME verify
-        envmod = self.envmod * 0.5 if vel==127 else self.envmod
-        
         self.filt_env.offset = ((1-envmod) * cutoff) 
         self.filt_env.scale = cutoff - self.filt_env.offset
         self.filt_env.rate = frate
         self.filt_env.retrigger()  # must retrigger once-shot LFOs
-        self.glider.glide_time = 0.1 if vel==1 else 0.001  # slide or minimal slide
+        self.glider.glide_time = glide_time
         self.glider.update(midi_note)  # glide up to new note
         ampenv = synthio.Envelope(attack_time=0.001,
-                                  attack_level = 0.8 if vel != 127 else 1.0,
+                                  attack_level = attack_level,
                                   decay_time = envdecay,
-                                  #decay_time = frate, 
                                   sustain_level=0,
-                                  release_time=0.01,) # self.envdecay)  
+                                  release_time=0.01) 
         self.note = synthio.Note(synthio.midi_to_hz(midi_note),
                                  bend = self.glider.lerp,
                                  filter = self.filter,
                                  envelope = ampenv,
                                  waveform = waves[self.wavenum])
         self.synth.press(self.note)
+        
+
+    def note_on(self, midi_note, vel=100):
+        """For MIDI use"""
+        self.note_on_step(midi_note, slide=(vel==1), accent=(vel==127))
 
     def note_off(self, midi_note, vel=0):
+        """Used for both MIDI and sequencer mode"""
         if self.note:
             self.synth.release(self.note)
             self.note = None
@@ -175,23 +182,6 @@ class TBishSynth:
         self.accent = v
         
     @property
-    def drive(self):
-        return self.fx_distortion.pre_gain
-    
-    @drive.setter
-    def drive(self,d):
-        self.fx_distortion.post_gain = -d/2
-        self.fx_distortion.pre_gain = d
-
-    @property
-    def drive_mix(self):
-        return self.fx_distortion.mix
-    
-    @drive_mix.setter
-    def drive_mix(self, m):
-        self.fx_distortion.mix = m
-        
-    @property
     def resonance(self):
         return self.filter.Q
     
@@ -201,3 +191,28 @@ class TBishSynth:
         if self.fx_filter1:
             self.fx_filter1.filter.Q = q
             self.fx_filter2.filter.Q = q
+
+    @property
+    def drive(self):
+        return self.fx_distortion.pre_gain
+    
+    @drive.setter
+    def drive(self,d):
+        self.fx_distortion.post_gain = -d/2
+        self.fx_distortion.pre_gain = d
+
+    @property
+    def delay_mix(self):
+        return self.fx_delay.mix
+    
+    @delay_mix.setter
+    def delay_mix(self, m):
+        self.fx_delay.mix = m
+        
+    @property
+    def delay_time(self):
+        return self.fx_delay.delay_ms / (self.secs_per_step * 100 * 2)
+    
+    @delay_time.setter
+    def delay_time(self, m):
+        self.fx_delay.delay_ms = self.secs_per_step * 1000 * 2 * m
