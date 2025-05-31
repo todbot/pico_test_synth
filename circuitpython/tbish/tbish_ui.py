@@ -26,8 +26,10 @@ class TBishUI(displayio.Group):
         palette = displayio.Palette(1)
         palette[0] = cw
         #self.rect = vectorio.Rectangle(pixel_shader=palette, width=64, height=1, x=32, y=1)
-        self.rect = vectorio.Rectangle(pixel_shader=palette, width=4, height=4, x=32, y=5)
-        self.append(self.rect)
+        self.paramspot = vectorio.Rectangle(pixel_shader=palette, width=4, height=4, x=32, y=5)
+        self.stepspot =  vectorio.Rectangle(pixel_shader=palette, width=5, height=5, x=64, y=60)
+        self.append(self.paramspot)
+        self.append(self.stepspot)
         
         for l in (self.textA, self.textB, self.labelA, self.labelB):
         #for l in (self.textA, self.textB):
@@ -37,9 +39,17 @@ class TBishUI(displayio.Group):
 
     def next_param_pair(self):
         self.curr_param_pair = (self.curr_param_pair+1) % self.num_param_pairs
+
+    def show_beat(self, step, steps_per_beat):
+        # this doesn't work right but sorta works
+        if step % steps_per_beat == 0 :
+            self.stepspot.hidden = False
+        else:
+            self.stepspot.hidden = True
         
     def update_param_pairs(self):
-        self.rect.x = 45 + 5*(self.curr_param_pair)
+        self.paramspot.x = 45 + 4*(self.curr_param_pair)
+
         paramL = self.params[self.curr_param_pair*2+0]
         paramR = self.params[self.curr_param_pair*2+1]
         textAnew = paramL.fmt % paramL.val

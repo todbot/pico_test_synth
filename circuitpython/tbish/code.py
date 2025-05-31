@@ -19,9 +19,9 @@ import synthio
 from synth_setup_pts import (mixer, knobA, knobB, keys,
                              setup_display, setup_touch, check_touch)
 
-from param_set import ParamSet, Param
+from paramset import ParamSet, Param
 
-from tbish_synth import TBishSynth
+from tbish_synth import TBishSynth, waves
 from tbish_sequencer import TBishSequencer
 from tbish_ui import TBishUI
 
@@ -34,6 +34,9 @@ steps_per_beat = 4   # 4 = 16th note, 2 = 8th note, 1 = quarter note
 seqs = [
     [[36, 36, 48, 36,  48, 48+7, 36, 48],  # notes, 0 = rest
      [127, 80, 80, 80,  127, 1, 30, 1]],   # vels, 1=slide, 127=accent
+    
+    [[36, 48, 36, 48,  36, 48, 36, 48],  # notes, 0 = rest
+     [127, 80, 1, 1,  127, 1, 30, 1]],   # vels, 1=slide, 127=accent
     
     [[34, 36, 34, 36,  48, 48, 36, 48],    # notes, 0 = rest
      [127, 80, 120, 80,  127, 11, 127, 80]],  # vels 127=accent
@@ -50,37 +53,41 @@ seqs_steps = [
 
 params = [
     #      name     val,  min,   max, str,  tb.attr name
-    Param("cutoff", 4000, 100, 6000, "%4d", 'cutoff'),
+    Param("cutoff", 3000, 100, 5000, "%4d", 'cutoff'),
     Param('envmod', 0.5,  0.0, 1.0, "%.2f",'envmod'), 
     
     Param("resQ",  1.0, 0.5, 4.0, "%.2f", 'resonance'),
     Param('decay', 0.75,  0.0, 1.0, "%.2f", 'decay'),
     
-    Param('drive', 30, 5, 40, "%2d", 'drive'),
+    
+    Param('accent', 0.2, 0.0, 1.0, "%.2f", 'accent'),
+    Param('wave', 0, 0, len(waves)-1, "%1d", 'wavenum'),
+
+    Param('drive', 0, 0.0, 1.0, "%.2f", 'drive'),
     Param('drivemix', 0.2, 0.0, 1.0, "%.2f", 'drive_mix'),
-        
-    Param('delay', 0.0, 0.0, 1.0, "%.2f", 'delay_mix'),
+    
     Param('dtime', 0.25, 0.0, 1.0, "%.2f", 'delay_time'),
+    Param('delaymix', 0.0, 0.0, 1.0, "%.2f", 'delay_mix'),
 
-    Param('seq', 0, 0, len(seqs), "%1d"),
+
     Param('transpose', 0, -13, 13, "%2d", 'transpose'),
-
-    Param('wave', 1, 0, 2, "%1d", 'wavenum'),
+    Param('what', 0.0, 0.0, 1.0, "%.2f", ),
+    
+    Param('seq', 0, 0, len(seqs)-1, "%1d"),
     Param('bpm', bpm, 40, 200, "%3d"),
     
 ]
 
-touchpad_to_knobset = [1,3,6,8,10,13]
+touchpad_to_knobset = [1,3,6,8,10,13,15]
 touchpad_to_transpose = [0,2,4,5,7,9,11,12,14]
     
 tb = TBishSynth(mixer.sample_rate, mixer.channel_count)
 tb_audio = tb.add_audioeffects()
 mixer.voice[0].play(tb_audio)
 
-sequencer = TBishSequencer(tb, seqs)
+sequencer = TBishSequencer(tb, seqs=seqs)
 sequencer.bpm = bpm
 sequencer.steps_per_beat = steps_per_beat
-
 param_set = ParamSet(params, num_knobs=2, knob_smooth=0.125)
 param_set.apply_params(tb)  # set up synth with param set
 
@@ -122,6 +129,7 @@ def update_ui():
         
         tb_disp.update_param_pairs()
 
+sequencer.on_step_callback = tb_disp.show_beat
 sequencer.start()
 
 while True:

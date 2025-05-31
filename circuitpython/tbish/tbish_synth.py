@@ -52,11 +52,17 @@ except (ImportError, NameError):
 from pitch_glider import Glider
 
 wave_size = 128
-wave_vol = 32677
+wave_vol = 32767
+saw_offset = 5
+wave_saw =  np.linspace(wave_vol, -wave_vol, num=wave_size, dtype=np.int16)   # saw
+wave_squ =  np.concatenate((np.ones(wave_size//2, dtype=np.int16) * wave_vol,  # square
+                            np.ones(wave_size//2, dtype=np.int16) * -wave_vol))
+wave_saw2 = wave_saw//2 + np.roll(wave_saw,saw_offset)//2    # equiv to np.add()
+
 waves = (
-    np.linspace(wave_vol, -wave_vol, num=wave_size, dtype=np.int16),   # saw
-    np.concatenate((np.ones(wave_size//2, dtype=np.int16) * wave_vol,  # square
-                    np.ones(wave_size//2, dtype=np.int16) * -wave_vol)),
+    wave_squ,
+    wave_saw,
+    wave_saw2,
 )
 
 class TBishSynth:
@@ -66,7 +72,7 @@ class TBishSynth:
         self.note = None
         self.secs_per_step = 0.125  # fixme
         self.transpose = 0
-        self.wavenum = 1   # which waveform to use: saw=0, square=1
+        self.wavenum = 0   # which waveform to use: square=0, saw=1, saw2=2
         self.cutoff = 8000  # aka 'filter frequency'
         self.envmod = 0.5  # aka 'filter depth'
         self.decay = 0.01
@@ -87,12 +93,14 @@ class TBishSynth:
         
         # No distortion on rp2040 (not enough CPU)
         self.fx_distortion = Distortion(**fxcfg, mix = 0.0,
+                                        #mode = audiofilters.DistortionMode.CLIP,
                                         mode = audiofilters.DistortionMode.LOFI,
                                         # other distortion modes are too slow? 
                                         #mode = audiofilters.DistortionMode.OVERDRIVE,
+                                        drive = 0.5,   # hmm this doesn't do what I expect
                                         soft_clip = True,
-                                        pre_gain = 30,
-                                        post_gain = -10)
+                                        pre_gain = 10,  # so we'll use pre-gain instead
+                                        post_gain = 0)
         
         # but yes filter on rp2040 with custom compile
         self.fx_filter1 = Filter(**fxcfg, mix=1.0)
@@ -108,7 +116,7 @@ class TBishSynth:
 
         self.fx_delay = audiodelays.Echo(**fxcfg, mix=0.0,
                                          max_delay_ms = 400,
-                                         delay_ms = self.secs_per_step * 1000 * 2,
+                                         delay_ms = self.secs_per_step * 1000 * 4,
                                          decay = 0.1,
                                          freq_shift = False,
                                          )
@@ -121,7 +129,7 @@ class TBishSynth:
 
     def note_on_step(self, midi_note, slide=False, accent=False):
         """Trigger a note, with slide and accent"""
-        print("note_on_step: %3d %1d %1d" % (midi_note, slide, accent))
+        print("note_on_step: %3d %1d %1d" % (midi_note, slide, accent), self.accent)
         self.note_off(midi_note) # must do when in step mode
         attack_level = 0.8
         cutoff = self.cutoff
@@ -129,10 +137,10 @@ class TBishSynth:
         envmod = self.envmod
         glide_time = 0.001  # minimal slide
         if accent:
-            attack_level +=  0.2 
-            cutoff *= 1.3   # FIXME: verify
-            #resonance *= 1.3
-            envmod *= 0.5
+            attack_level = min(1.0, attack_level + 0.5 * self.accent)
+            cutoff = cutoff + 0.3 * self.accent   # FIXME: verify
+            #resonance *= 1.3  # FIXME: how to do 
+            envmod = min(1.0, envmod + 0.25 * self.accent)
         if slide:
             glide_time = 0.1
             # FIXME also do appropriate other actions for slide
@@ -180,13 +188,15 @@ class TBishSynth:
 
     @property
     def drive(self):
-        return self.fx_distortion.pre_gain
+        #return self.fx_distortion.drive
+        return self.fx_distortion.pre_gain / 50
     
     @drive.setter
     def drive(self,d):
-        self.fx_distortion.post_gain = -d/2
-        self.fx_distortion.pre_gain = d
-
+        #self.fx_distortion.drive = d  # hmm doesn't seem to work like I expect
+        self.fx_distortion.pre_gain = d * 50
+        self.fx_distortion.post_gain = self.fx_distortion.pre_gain * -0.5
+        
     @property
     def drive_mix(self):
         return self.fx_distortion.mix
@@ -205,8 +215,8 @@ class TBishSynth:
         
     @property
     def delay_time(self):
-        return self.fx_delay.delay_ms / (self.secs_per_step * 100 * 4)
+        return self.fx_delay.delay_ms / (self.secs_per_step * 1000 * 4)
     
     @delay_time.setter
-    def delay_time(self, m):
-        self.fx_delay.delay_ms = self.secs_per_step * 1000 * 4 * m
+    def delay_time(self, t):
+        self.fx_delay.delay_ms = self.secs_per_step * 1000 * 4 * t   # FIXME: explain 4

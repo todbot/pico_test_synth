@@ -1,11 +1,11 @@
 import time
 
 class TBishSequencer:
-    def __init__(self, tb, seqs):
+    def __init__(self, tb, steps_per_beat=4, bpm=120, seqs=None):
         self.tb = tb
         self.seqs = seqs
-        self._steps_per_beat = 4   # 4 = 16th note, 2 = 8th note, 1 = quarter note
-        self.bpm = 120
+        self._steps_per_beat = steps_per_beat   # 4 = 16th note, 2 = 8th note, 1 = quarter note
+        self.bpm = bpm
         self.gate_time = 0
         self.gate_amount = 0.75  # traiditional 303 gate length
         self.next_step_time = 0
@@ -16,6 +16,7 @@ class TBishSequencer:
         self.transpose = 0
         self.i = 0  # step number
         self.playing = True
+        self.on_step_callback = None
 
     @property
     def steps_per_beat(self):
@@ -43,10 +44,9 @@ class TBishSequencer:
     def stop(self):
         self.playing = False
         self.tb.note_off(self.midi_note)
-    
+
     def update(self):
-        if not self.playing:
-            return
+        
         now = time.monotonic()
     
         # turn off note (not really a TB-303 thing, but a MIDI thing)
@@ -60,6 +60,12 @@ class TBishSequencer:
             self.next_step_time = now + self._secs_per_step + dt  
             # add dt delta to attempt to make up for display hosing us
 
+            if self.on_step_callback:  # and (self.i % self._steps_per_beat)==0:
+                self.on_step_callback(self.i, self.steps_per_beat)
+
+            if not self.playing:
+                return
+            
             midi_note = self.seqs[self.seq_num][0][self.i]
             vel       = self.seqs[self.seq_num][1][self.i]
             if midi_note != 0:    # midi_note == 0 = rest

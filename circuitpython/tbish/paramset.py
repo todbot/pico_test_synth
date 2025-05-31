@@ -18,10 +18,6 @@
 
 import json
 
-KNOB_MODE_PICKUP = 0
-KNOB_MODE_SCALE = 1
-KNOB_MODE_RELATIVE = 2
-
 class Param:
     """Params are a UI- and implementation-independent way of describing
     a named numerical parameter with a min/max, a display format, and
@@ -64,12 +60,19 @@ class Param:
             setattr(o, self.objattr, self.val)
 
 class ParamSet:
+
+    KNOB_PICKUP = 0
+    KNOB_SCALE = 1
+    KNOB_RELATIVE = 2
+
     """ParamSet is a collection of Params that track normalized knob positions,
     especially for the case when there are fewer knobs than Params.
     """
 
-    def __init__(self, params, num_knobs, min_knob_change=0.05, knob_smooth=0.5):
+    def __init__(self, params, num_knobs, min_knob_change=0.05,
+                 knob_smooth=0.5, knob_mode = KNOB_PICKUP):
         self.params = params
+        self.knob_mode = knob_mode
         self.nparams = len(params)
         self.nknobs = num_knobs
         self.min_change = min_knob_change
@@ -95,17 +98,50 @@ class ParamSet:
         self._idx = i
 
     def update_knobs(self, new_knob_vals):
-        """new_knob_val is list of new knob vals, each 0.0-1.0"""
+        if self.knob_mode == ParamSet.KNOB_PICKUP:
+            self.update_knobs_pickup(new_knob_vals)
+        elif self.knob_mode == ParamSet.KNOB_SCALE:
+            self.update_knobs_scale(new_knob_vals)
+
+    def update_knobs_pickup(self, new_knob_vals):
+        """new_knob_vals is list of new knob vals, each 0.0-1.0"""
         for i in range(self.nknobs):
             param = self.params[ (self._idx * self.nknobs) + i ]
             new_val = param.knob_to_val(new_knob_vals[i])
             if self.is_tracking[i]:
-                param.val = self.smoothing * new_val + (1-self.smoothing) * param.val
+                # only change param val if difference is big enough FIXME
+                if abs(new_val - param.val) >= 0.1 * self.min_change * param.span:
+                    param.val = new_val
             else:
                 delta = param.val - new_val
                 if abs(delta) < self.min_change * param.span:
                     self.is_tracking[i] = True
-                    #param.val = new_val
+
+    def update_knobs_scale(self, new_knob_vals):
+        """new_knob_val is list of new knob vals, each normalized 0.0-1.0"""
+        # note this sucks currently
+        for i in range(self.nknobs):
+            param = self.params[ (self._idx * self.nknobs) + i ]
+            new_val = param.knob_to_val(new_knob_vals[i])
+            delta_val = new_val - param.val
+            
+            val_min, val_max = param.vmin, param.vmax
+            knob_min, knob_max = 0.0, 1.0
+            
+            val_max_pos_delta = val_max - param.val
+            val_min_pos_delta = param.val - val_min
+            knob_max_pos_delta = val_max - new_val
+            knob_min_pos_delta = new_val - val_min
+            
+            if delta_val > 0 and knob_max_pos_delta != 0:
+                val_percent_change = delta_val * val_max_pos_delta / knob_max_pos_delta
+            elif delta_val < 0 and knob_min_pos_delta != 0:
+                val_percent_change = delta_val * val_min_pos_delta / knob_min_pos_delta
+            else:
+                val_percent_change = 0
+
+            param.val = min(max(param.val + val_percent_change, val_min), val_max)
+            
 
     def apply_params(self, obj):
         """ Apply all params to given object """
