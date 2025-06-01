@@ -35,17 +35,28 @@ class TBishUI(displayio.Group):
         #for l in (self.textA, self.textB):
             self.append(l)
 
+        self.logo = label.Label(fnt, text="TBishBassSynth", color=cw, x=20,y=45)
+        self.append(self.logo)
+
         self.display.refresh()
 
     def next_param_pair(self):
         self.curr_param_pair = (self.curr_param_pair+1) % self.num_param_pairs
 
-    def show_beat(self, step, steps_per_beat):
+    def stop(self):
+        pass
+    
+    def start(self):
+        pass
+    
+    def show_beat(self, step, steps_per_beat, seq_len):
+        self.stepspot.x = 5 + step * 6
+        
         # this doesn't work right but sorta works
-        if step % steps_per_beat == 0 :
-            self.stepspot.hidden = False
-        else:
-            self.stepspot.hidden = True
+        #if step % steps_per_beat == 0 :
+        #    self.stepspot.hidden = False
+        #else:
+        #    self.stepspot.hidden = True
         
     def update_param_pairs(self):
         self.paramspot.x = 45 + 4*(self.curr_param_pair)

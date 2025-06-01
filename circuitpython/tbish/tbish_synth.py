@@ -129,7 +129,7 @@ class TBishSynth:
 
     def note_on_step(self, midi_note, slide=False, accent=False):
         """Trigger a note, with slide and accent"""
-        print("note_on_step: %3d %1d %1d" % (midi_note, slide, accent), self.accent)
+        print("note_on_step: %3d %1d %1d" % (midi_note, slide, accent))
         self.note_off(midi_note) # must do when in step mode
         attack_level = 0.8
         cutoff = self.cutoff
@@ -138,7 +138,8 @@ class TBishSynth:
         glide_time = 0.001  # minimal slide
         if accent:
             attack_level = min(1.0, attack_level + 0.5 * self.accent)
-            cutoff = cutoff + 0.3 * self.accent   # FIXME: verify
+            cutoff = max(cutoff, 4000 * self.accent)   # FIXME: verify
+            print("\ncutoff:", cutoff, self.cutoff, "\n")
             #resonance *= 1.3  # FIXME: how to do 
             envmod = min(1.0, envmod + 0.25 * self.accent)
         if slide:

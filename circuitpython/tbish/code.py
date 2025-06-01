@@ -138,12 +138,14 @@ while True:
         if key.pressed:
             if sequencer.playing:
                 sequencer.stop()
+                tb_disp.stop()
                 # testing out save/load params
                 s = ParamSet.dump(param_set)
                 print(s)
                 ParamSet.load(s)
                 
             else:
+                tb_disp.start()
                 sequencer.start()
 
     if touch_events := check_touch():

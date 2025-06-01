@@ -16,7 +16,7 @@ class TBishSequencer:
         self.transpose = 0
         self.i = 0  # step number
         self.playing = True
-        self.on_step_callback = None
+        self.on_step_callback = None   # callback is func(step, steps_per_beat, seq_len)
 
     @property
     def steps_per_beat(self):
@@ -59,9 +59,10 @@ class TBishSequencer:
         if dt <= 0:
             self.next_step_time = now + self._secs_per_step + dt  
             # add dt delta to attempt to make up for display hosing us
-
+            
+            seq_len = len(self.seqs[self.seq_num][0])
             if self.on_step_callback:  # and (self.i % self._steps_per_beat)==0:
-                self.on_step_callback(self.i, self.steps_per_beat)
+                self.on_step_callback(self.i, self.steps_per_beat, seq_len)
 
             if not self.playing:
                 return
@@ -77,9 +78,9 @@ class TBishSequencer:
                 self.gate_off_time = time.monotonic() + self._secs_per_step * self.gate_amount
 
             #seq_num = int(param_set.param_for_name('seq').val)
-            self.i = (self.i+1) % len(self.seqs[self.seq_num][0])
+            self.i = (self.i+1) % seq_len
             self.midi_note = midi_note
         
-            print(self.i,"note: %d vel:%3d" % (midi_note, vel),
+            print("step", self.i,"note: %d vel:%3d" % (midi_note, vel),
                   int(self._secs_per_step*1000), int(dt*1000))
 

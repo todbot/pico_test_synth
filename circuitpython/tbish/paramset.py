@@ -60,14 +60,13 @@ class Param:
             setattr(o, self.objattr, self.val)
 
 class ParamSet:
+    """ParamSet is a collection of Params that track normalized knob positions,
+    especially for the case when there are fewer knobs than Params.
+    """
 
     KNOB_PICKUP = 0
     KNOB_SCALE = 1
     KNOB_RELATIVE = 2
-
-    """ParamSet is a collection of Params that track normalized knob positions,
-    especially for the case when there are fewer knobs than Params.
-    """
 
     def __init__(self, params, num_knobs, min_knob_change=0.05,
                  knob_smooth=0.5, knob_mode = KNOB_PICKUP):
