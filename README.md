@@ -1,7 +1,7 @@
 # pico_test_synth
 
 A simple 
-[Raspberry Pi Pico RP2040](https://www.raspberrypi.com/documentation/microcontrollers/raspberry-pi-pico.html)-based
+[Raspberry Pi Pico RP2040 or Pico 2 RP2350](https://www.raspberrypi.com/documentation/microcontrollers/raspberry-pi-pico.html)-based
 synth to experiment with [`synthio`](https://github.com/todbot/circuitpython-synthio-tricks) and [Mozzi](https://github.com/sensorium/Mozzi).
 
 <a href="https://www.tindie.com/products/todbot/pico_test_synth/?ref=offsite_badges&utm_source=sellers_todbot&utm_medium=badges&utm_campaign=badge_small"><img src="https://d2ss6ovg47m0r5.cloudfront.net/badges/tindie-smalls.png" alt="I sell on Tindie" width="200" height="55"></a>
@@ -39,9 +39,9 @@ synth to experiment with [`synthio`](https://github.com/todbot/circuitpython-syn
 - Both use the same components
 - Both run the same code 
 - Both fit in the same enclosure
-- `pico_test_synth2` drawn in Kicad, `pico_test_synth` drawn in Eagle
-- `pico_test_synth2` has square buttons, `pico_test_synth` has round buttons
-- `pico_test_synth2` can work with Pico2 with a jumper change and code change
+- `pico_test_synth2` drawn in Kicad; `pico_test_synth` drawn in Eagle
+- `pico_test_synth2` has square buttons; `pico_test_synth` has round buttons
+- `pico_test_synth2` can work with Pico 2 and Pico 
 - `pico_test_synth` can only work with Pico1
 
 
