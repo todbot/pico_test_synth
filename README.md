@@ -52,11 +52,13 @@ will work with this board too with minimal changes.
 
 Some programs written specifically for this board:
 
-* [hwtest](https://github.com/todbot/pico_test_synth/tree/main/circuitpython/hwtest/code.py) - test out the hardware with a simple synth
-  * [video demo](https://www.youtube.com/watch?v=9U2Dn7ckdbs)
+* [hwtest](https://github.com/todbot/pico_test_synth/tree/main/circuitpython/hwtest/code.py) - test out the hardware with a simple synth ([video demo](https://www.youtube.com/watch?v=9U2Dn7ckdbs))
 * [wavesynth](https://github.com/todbot/pico_test_synth/tree/main/circuitpython/wavesynth/) - port of wavesynth for qtpy_synth board with some improvements
 
-More code specific for this board coming!
+* [TBish](https://github.com/todbot/pico_test_synth/tree/main/circuitpython/tbish/) - a TB303-like synth demo ([video demo](https://www.youtube.com/watch?v=1AflpXbEIno))
+
+
+* [monosynth1](https://github.com/todbot/pico_test_synth/tree/main/arduino/monosynth1) - a full Moog-like monosynth written in Arduino & Mozzi 
 
 #### See also:
 - https://github.com/todbot/circuitpython-synthio-tricks
