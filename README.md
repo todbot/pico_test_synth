@@ -61,9 +61,10 @@ Some programs written specifically for this board:
 * [monosynth1](https://github.com/todbot/pico_test_synth/tree/main/arduino/monosynth1) - a full Moog-like monosynth written in Arduino & Mozzi 
 
 #### See also:
-- https://github.com/todbot/circuitpython-synthio-tricks
+- [CircuitPython Synthio Tricks](https://github.com/todbot/circuitpython-synthio-tricks)
   - Contains [many other synthio examples](https://github.com/todbot/circuitpython-synthio-tricks/tree/main/examples) that can work with this synth with minimal changes
-
+- [Synthio Tutorial](https://todbot.github.io/CircuitPython_Synthio_Tutorial/) 
+  - a getting-started guide for `synthio` ending with some full synthesiser voices 
 
 ### Enclosure
 
