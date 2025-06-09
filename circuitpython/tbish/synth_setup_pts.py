@@ -1,7 +1,13 @@
-# synth_setup_pts.py -- Getting synthio up and running on pico_touch_synth board
-# part of todbot circuitpython synthio tutorial
-# 10 Feb 2025 - @todbot / Tod Kurt
-#
+# SPDX-FileCopyrightText: Copyright (c) 2025 Tod Kurt
+# SPDX-License-Identifier: MIT
+"""
+`synth_setup_pts.py`
+
+Getting synthio up and running on pico_touch_synth board
+part of todbot circuitpython synthio tutorial
+10 Feb 2025 - @todbot / Tod Kurt
+"""
+
 import board
 import synthio
 import audiobusio

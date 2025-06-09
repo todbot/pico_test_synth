@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2023 Tod Kurt
+# SPDX-FileCopyrightText: Copyright (c) 2025 Tod Kurt
 # SPDX-License-Identifier: MIT
 """
 `code.py`
