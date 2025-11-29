@@ -102,8 +102,7 @@ mixer.voice[0].play(synth)
 
 # set up the synth
 wave_saw = np.linspace(32000,-32000, num=256, dtype=np.int16)  # default squ is too clippy
-#amp_env = synthio.Envelope(attack_level=1.0, sustain_level=1.0, release_time=0.4, attack_time=0.4, decay_time=0.5)
-amp_env = synthio.Envelope(release_time=0.4, attack_time=0.2, attack_level=0.5, sustain_level=0.5)
+amp_env = synthio.Envelope(attack_time=0.2, release_time=0.4, decay_time=0.5, attack_level=0.5, sustain_level=0.5)
 synth.envelope = amp_env
 
 # set up info to be displayed
@@ -138,7 +137,7 @@ async def debug_printer():
     t1_last = ""
     t2_last = ""
     while True:
-        t1 = "K:%3d %3d S:%d" % (knobA.value//255, knobB.value//255, sw_pressed)
+        t1 = "K1:%3d   S:%d   %3d:K2" % (knobA.value//255, sw_pressed, knobB.value//255)
         t2 = "T:" + ''.join('%1d' % t.value for t in touchins)
         if t1 != t1_last:
             t1_last = t1
@@ -148,12 +147,12 @@ async def debug_printer():
             text2.text = t2
         print(text1.text)
         print(text2.text)
-        print("T:" + ''.join(["%3d " % (t.raw_value//16) for t in touchins[0:4]]))
+        #print("T:" + ''.join(["%3d " % (t.raw_value//16) for t in touchins[0:4]]))
         await asyncio.sleep(0.2)
 
 # handle all user input: knobs, button, and touchpads
 async def input_handler():
-    global filter_freq, filter_resonance
+    global filter_freq, filter_resonance, sw_pressed
 
     last_touches = [False] * num_touch_pins
     
@@ -171,14 +170,14 @@ async def input_handler():
             lt = last_touches[i]
             last_touches[i] = t
             if t and not lt:   # press
-                print("touch press",i)
+                print("\t\ttouch press  ",i)
                 midi_note = midi_notes[i]
                 note_on(midi_note)
                 msg = NoteOn(midi_note, velocity=100)
                 midi_usb.send( msg )
                 midi_uart.send( msg )
             elif not t and lt:
-                print("touch release",i)
+                print("\t\ttouch release",i)
                 midi_note = midi_notes[i]
                 note_off(midi_note)
                 msg = NoteOff(midi_note, velocity=0)
