@@ -1,27 +1,26 @@
-
 # pico_test_synth.py -- hardware defines and setup for pico_test_synth board
 # 22 Jul 2023 - @todbot / Tod Kurt
 # part of https://github.com/todbot/pico_test_synth
 #
 # libraries needed:
-#  circup install neopixel, adafruit_debouncer, adafruit_displayio_ssd1306
+#  circup install adafruit_displayio_ssd1306
 #
 # UI fixme:
 # knob "pickup" vs knob "catchup"  (maybe done in app instead)
 
-import board, busio
+import board, busio, digitalio
 import analogio, keypad
 import touchio
-from adafruit_debouncer import Debouncer
-import neopixel
 import audiopwmio, audiomixer, audiobusio
 import synthio
-import displayio
+import displayio, i2cdisplaybus
 import adafruit_displayio_ssd1306
+
 
 SAMPLE_RATE = 25600   # lets try powers of two
 MIXER_BUFFER_SIZE = 4096
 DW,DH = 128, 64  # display width/height
+
 
 # pin definitions
 sw_pin        = board.GP28
@@ -41,29 +40,33 @@ touch_pins = (
     board.GP6, board.GP7 ,board.GP8, board.GP9, board.GP10, board.GP11,
     board.GP12, board.GP13, board.GP14, board.GP15 )
 
-
 class PicoTestSynthHardware():
-    def __init__(self):
-        self.led = neopixel.NeoPixel(led_pin, 1, brightness=0.1)
+
+    def __init__(self, pull_type=digitalio.Pull.UP):
+        # Set which way touch pads work
+        # For pico_test_synth2 with Pico2 or Pico, use Pull.UP
+        # FOr pico_test_synth, for Pico only, use Pull.DOWN
+        self.led = digitalio.DigitalInOut(led_pin)
+        self.led.switch_to_output(value=False)
         self.keys = keypad.Keys( pins=(sw_pin,),  value_when_pressed=False )
         self._knobA = analogio.AnalogIn(knobA_pin)
         self._knobB = analogio.AnalogIn(knobB_pin)
         self.knobA = self._knobA.value
         self.knobB = self._knobB.value
 
+        self.num_touch_pads = len(touch_pins)
+        self.last_touches = [False] * self.num_touch_pads
         self.touchins = []  # for raw_value
-        self.touches = []   # for debouncer
         for pin in touch_pins:
-           touchin = touchio.TouchIn(pin)
+           touchin = touchio.TouchIn(pin, pull=pull_type)
            # touchin.threshold = int(touchin.threshold * 1.1) # noise protection
            self.touchins.append(touchin)
-           self.touches.append( Debouncer(touchin) )
 
         self.midi_uart = busio.UART(rx=uart_rx_pin, tx=uart_tx_pin, baudrate=31250, timeout=0.001)
 
         displayio.release_displays()
         i2c = busio.I2C(scl=i2c_scl_pin, sda=i2c_sda_pin, frequency=400_000 )
-        display_bus = displayio.I2CDisplay(i2c, device_address=0x3c )
+        display_bus = i2cdisplaybus.I2CDisplayBus(i2c, device_address=0x3c)
         self.display = adafruit_displayio_ssd1306.SSD1306(display_bus,
                                                           width=DW, height=DH, rotation=180)
 
@@ -84,11 +87,13 @@ class PicoTestSynthHardware():
     def check_touch(self):
         """Check the four touch inputs, return keypad-like Events"""
         events = []
-        for i,touch in enumerate(self.touches):
-            touch.update()
-            if touch.rose:
+        for i,touch in enumerate(self.touchins):
+            t = touch.value
+            lt = self.last_touches[i]
+            self.last_touches[i] = t
+            if t and not lt:  # press
                 events.append(keypad.Event(i,True))
-            elif touch.fell:
+            if not t and lt:  # release
                 events.append(keypad.Event(i,False))
         return events
 

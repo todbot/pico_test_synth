@@ -1,3 +1,9 @@
+# synth1 for pico_test_synth2/pico_test_synth
+# 2023 - @todbot / Tod Kurt
+# 
+# To install, copy this 'code.py' and 'pico_test_synth.py' to CIRCUITPY
+# and install needed third-party libraries with:
+#  - circup install adafruit_display_text adafruit_displayio_ssd1306
 #
 #
 #
@@ -12,7 +18,9 @@ from adafruit_display_text import bitmap_label as label
 
 from pico_test_synth import PicoTestSynthHardware
 
-pts = PicoTestSynthHardware()
+
+pts = PicoTestSynthHardware()  # this is for pico_test_synth2
+#pts = PicoTestSynthHardware(pull_type=digitalio.pull.DOWN)  # pico_test_synth1
 
 touch_midi_notes = list(range(45,45+16))
 filter_freq = 4000
@@ -25,13 +33,13 @@ pts.synth.envelope = amp_env
 
 # set up info to be displayed
 maingroup = displayio.Group()
-pts.display.show(maingroup)
+pts.display.root_group = maingroup
 text1 = label.Label(terminalio.FONT, text="helloworld...", x=0, y=10)
 text2 = label.Label(terminalio.FONT, text="@todbot", x=0, y=25)
 text3 = label.Label(terminalio.FONT, text="hwtest. press!", x=0, y=50)
 for t in (text1, text2, text3):
     maingroup.append(t)
-
+time.sleep(1)
 
 notes_playing = {}  # dict of notes currently playing
 
@@ -52,7 +60,8 @@ def note_on( notenum, vel=64):
     print("note_on", notenum, vel)
     #cfg.filter_mod = (vel/127) * 1500
     f = synthio.midi_to_hz(notenum)
-    filt = pts.synth.low_pass_filter(filter_freq, filter_resonance)
+    filt = synthio.Biquad(synthio.FilterMode.LOW_PASS, filter_freq, filter_resonance)
+    #filt = pts.synth. low_pass_filter(filter_freq, filter_resonance)
     note = synthio.Note( frequency=f, waveform=wave_saw, filter=filt)
     notes_playing[notenum] = note
     pts.synth.press( note )
@@ -100,7 +109,7 @@ async def synth_updater():
         for n in notes_playing.values():
             if n:
                 if filt is None:
-                    filt = pts.synth.low_pass_filter(filter_freq, filter_resonance)
+                    filt = synthio.Biquad(synthio.FilterMode.LOW_PASS, filter_freq, filter_resonance)
                 n.filter = filt
         await asyncio.sleep(0.01)
 
