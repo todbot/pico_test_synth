@@ -6,8 +6,6 @@
 #  - circup install adafruit_display_text adafruit_displayio_ssd1306
 #
 #
-#
-#
 
 import asyncio
 import time, random
@@ -17,7 +15,6 @@ import displayio, terminalio
 from adafruit_display_text import bitmap_label as label
 
 from pico_test_synth import PicoTestSynthHardware
-
 
 pts = PicoTestSynthHardware()  # this is for pico_test_synth2
 #pts = PicoTestSynthHardware(pull_type=digitalio.pull.DOWN)  # pico_test_synth1
@@ -34,34 +31,37 @@ pts.synth.envelope = amp_env
 # set up info to be displayed
 maingroup = displayio.Group()
 pts.display.root_group = maingroup
-text1 = label.Label(terminalio.FONT, text="helloworld...", x=0, y=10)
+text1 = label.Label(terminalio.FONT, text="pico_test_synth...", x=0, y=10)
 text2 = label.Label(terminalio.FONT, text="@todbot", x=0, y=25)
-text3 = label.Label(terminalio.FONT, text="hwtest. press!", x=0, y=50)
+text3 = label.Label(terminalio.FONT, text="synth1. press!", x=0, y=50)
 for t in (text1, text2, text3):
     maingroup.append(t)
 time.sleep(1)
+text2.text = "pico_test_synth"
 
 notes_playing = {}  # dict of notes currently playing
 
-# filter_types = ['lpf', 'hpf', 'bpf']
-# def make_filter():
-#     freq = cfg.filter_f + cfg.filter_mod
-#     if cfg.filter_type == 'lpf':
-#         filter = qts.synth.low_pass_filter(freq, cfg.filter_q)
-#     elif cfg.filter_type == 'hpf':
-#         filter = qts.synth.high_pass_filter(freq, cfg.filter_q)
-#     elif cfg.filter_type == 'bpf':
-#         filter = qts.synth.band_pass_filter(freq, cfg.filter_q)
-#     else:
-#         print("unknown filter type", cfg.filter_type)
-#     return filter
+
+filter_types = [('lpf', synthio.FilterMode.LOW_PASS),
+                ('hpf', synthio.FilterMode.HIGH_PASS),
+                ('bpf', synthio.FilterMode.BAND_PASS),
+                ]
+
+# filter_types = {'lpf': synthio.FilterMode.LOW_PASS,
+#                 'hpf': synthio.FilterMode.HIGH_PASS,
+#                 'bpf': synthio.FilterMode.BAND_PASS,
+#                 }
+
+filter_type_idx = 0
+filter_type = filter_types[filter_type_idx][1]
 
 def note_on( notenum, vel=64):
+    global filter_type
     print("note_on", notenum, vel)
     #cfg.filter_mod = (vel/127) * 1500
     f = synthio.midi_to_hz(notenum)
-    filt = synthio.Biquad(synthio.FilterMode.LOW_PASS, filter_freq, filter_resonance)
-    #filt = pts.synth. low_pass_filter(filter_freq, filter_resonance)
+    filter_type = filter_types[filter_type_idx][1]
+    filt = synthio.Biquad(filter_type, filter_freq, filter_resonance)
     note = synthio.Note( frequency=f, waveform=wave_saw, filter=filt)
     notes_playing[notenum] = note
     pts.synth.press( note )
@@ -76,18 +76,14 @@ def note_off( notenum, vel=0):
 
 async def input_handler():
     global sw_pressed
-    global filter_freq, filter_resonance
+    global filter_freq, filter_resonance, filter_type_idx
 
     note = None
 
     while True:
         knobA_val, knobB_val = pts.read_pots()
         filter_freq = knobA_val/65535 * 8000 + 100  # range 100-8100
-        filter_resonance = knobB_val/65535 * 3 + 0.2  # range 0.2-3.2
-
-        # for n in touch_notes:  # real-time adjustment of filter
-        #     if n:
-        #         n.filter = pts.synth.low_pass_filter(filter_freq, filter_resonance)
+        filter_resonance = knobB_val/65535 * 3.5 + 0.2  # range 0.2-3.2
 
         if touches := pts.check_touch():
             for touch in touches:
@@ -97,8 +93,7 @@ async def input_handler():
         if key := pts.check_key():
             if key.pressed:
                 print("KEY PRESS")
-                #ftpos = (filter_types.index(cfg.filter_type)+1) % len(filter_types)
-                #cfg.filter_type = filter_types[ ftpos ]
+                filter_type_idx = (filter_type_idx+1) % len(filter_types)
 
         await asyncio.sleep(0.005)
 
@@ -109,7 +104,7 @@ async def synth_updater():
         for n in notes_playing.values():
             if n:
                 if filt is None:
-                    filt = synthio.Biquad(synthio.FilterMode.LOW_PASS, filter_freq, filter_resonance)
+                    filt = synthio.Biquad(filter_type, filter_freq, filter_resonance)
                 n.filter = filt
         await asyncio.sleep(0.01)
 
@@ -121,12 +116,11 @@ async def uart_handler():
 
 async def debug_printer():
     while True:
-        #text1.text = "K:%3d %3d S:%d" % (pts.knobA//255, pts.knobB//255, sw_pressed)
-        text1.text = "K:%3d %3d S:%d" % (pts.knobA//255, pts.knobB//255, False)
-        text2.text = "T:" + ''.join(["%3d " % v for v in (pts.touchins[0].raw_value//16, pts.touchins[1].raw_value//16, pts.touchins[2].raw_value//16, pts.touchins[3].raw_value//16)])
+        text1.text = "K1:%3d  %s   %3d:K2" % (pts.knobA//255,
+                                              filter_types[filter_type_idx][0],
+                                              pts.knobB//255)
         print(text1.text)
-        print(text2.text)
-        await asyncio.sleep(0.3)
+        await asyncio.sleep(0.2)
 
 # main coroutine
 async def main():  # Don't forget the async!
@@ -136,5 +130,5 @@ async def main():  # Don't forget the async!
     task4 = asyncio.create_task(synth_updater())
     await asyncio.gather(task1,task2,task3,task4)
 
-print("hello pico_test_synth hwtest")
+print("hello pico_test_synth synth1")
 asyncio.run(main())
