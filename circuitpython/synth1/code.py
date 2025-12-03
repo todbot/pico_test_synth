@@ -1,6 +1,6 @@
 # synth1 for pico_test_synth2/pico_test_synth
 # 2023 - @todbot / Tod Kurt
-# 
+#
 # To install, copy this 'code.py' and 'pico_test_synth.py' to CIRCUITPY
 # and install needed third-party libraries with:
 #  - circup install adafruit_display_text adafruit_displayio_ssd1306
@@ -8,7 +8,7 @@
 #
 
 import asyncio
-import time, random
+import time
 import ulab.numpy as np
 import synthio
 import displayio, terminalio
@@ -19,9 +19,10 @@ from pico_test_synth import PicoTestSynthHardware
 pts = PicoTestSynthHardware()  # this is for pico_test_synth2
 #pts = PicoTestSynthHardware(pull_type=digitalio.pull.DOWN)  # pico_test_synth1
 
-touch_midi_notes = list(range(45,45+16))
+touch_midi_notes = list(range(48,48+16))
 filter_freq = 4000
 filter_resonance = 1.2
+detune = 1.008
 
 # set up the synth
 wave_saw = np.linspace(30000,-30000, num=256, dtype=np.int16)  # default squ is too clippy
@@ -44,56 +45,49 @@ notes_playing = {}  # dict of notes currently playing
 
 filter_types = [('lpf', synthio.FilterMode.LOW_PASS),
                 ('hpf', synthio.FilterMode.HIGH_PASS),
-                ('bpf', synthio.FilterMode.BAND_PASS),
-                ]
-
-# filter_types = {'lpf': synthio.FilterMode.LOW_PASS,
-#                 'hpf': synthio.FilterMode.HIGH_PASS,
-#                 'bpf': synthio.FilterMode.BAND_PASS,
-#                 }
-
+                ('bpf', synthio.FilterMode.BAND_PASS),]
 filter_type_idx = 0
 filter_type = filter_types[filter_type_idx][1]
 
 def note_on( notenum, vel=64):
-    global filter_type
     print("note_on", notenum, vel)
     #cfg.filter_mod = (vel/127) * 1500
     f = synthio.midi_to_hz(notenum)
-    filter_type = filter_types[filter_type_idx][1]
     filt = synthio.Biquad(filter_type, filter_freq, filter_resonance)
-    note = synthio.Note( frequency=f, waveform=wave_saw, filter=filt)
-    notes_playing[notenum] = note
-    pts.synth.press( note )
+    notes = (
+        synthio.Note( frequency=f, waveform=wave_saw, filter=filt),
+        synthio.Note( frequency=f * detune, waveform=wave_saw, filter=filt))
+    notes_playing[notenum] = notes
+    pts.synth.press(notes)
     pts.led.value = True
 
 def note_off( notenum, vel=0):
     print("note_off", notenum, vel)
-    if note := notes_playing[notenum]:
-        pts.synth.release( note )
+    if notes := notes_playing[notenum]:
+        pts.synth.release(notes)
     pts.led.value = False
 
 
 async def input_handler():
-    global sw_pressed
-    global filter_freq, filter_resonance, filter_type_idx
-
-    note = None
+    global filter_freq, filter_resonance, filter_type_idx, filter_type
 
     while True:
         knobA_val, knobB_val = pts.read_pots()
-        filter_freq = knobA_val/65535 * 8000 + 100  # range 100-8100
+        filter_freq = knobA_val/65535 * 8000 + 10  # range 10-8010
         filter_resonance = knobB_val/65535 * 3.5 + 0.2  # range 0.2-3.2
 
         if touches := pts.check_touch():
             for touch in touches:
-                if touch.pressed: note_on( touch_midi_notes[touch.key_number] )
-                if touch.released: note_off( touch_midi_notes[touch.key_number] )
+                if touch.pressed:
+                    note_on( touch_midi_notes[touch.key_number] )
+                if touch.released:
+                    note_off( touch_midi_notes[touch.key_number] )
 
         if key := pts.check_key():
             if key.pressed:
-                print("KEY PRESS")
+                print("BUTTON PRESS")
                 filter_type_idx = (filter_type_idx+1) % len(filter_types)
+                filter_type = filter_types[filter_type_idx][1]
 
         await asyncio.sleep(0.005)
 
@@ -101,11 +95,12 @@ async def synth_updater():
     # for any notes playing, adjust its filter in realtime
     while True:
         filt = None
-        for n in notes_playing.values():
-            if n:
-                if filt is None:
-                    filt = synthio.Biquad(filter_type, filter_freq, filter_resonance)
-                n.filter = filt
+        for notes in notes_playing.values():
+            for n in notes:
+                if n:
+                    if filt is None:
+                        filt = synthio.Biquad(filter_type, filter_freq, filter_resonance)
+                    n.filter = filt
         await asyncio.sleep(0.01)
 
 async def uart_handler():
