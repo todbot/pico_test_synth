@@ -20,7 +20,7 @@ pts = PicoTestSynthHardware()  # this is for pico_test_synth2
 #pts = PicoTestSynthHardware(pull_type=digitalio.pull.DOWN)  # pico_test_synth1
 
 touch_midi_notes = list(range(48,48+16))
-filter_freq = 4000
+filter_freq = 8000
 filter_resonance = 1.2
 detune = 1.008
 
@@ -49,16 +49,23 @@ filter_types = [('lpf', synthio.FilterMode.LOW_PASS),
 filter_type_idx = 0
 filter_type = filter_types[filter_type_idx][1]
 
+filter_min_freq = 50
+filter_attack_time = 1.75
+filter_attack_lfo = synthio.LFO(once=True, rate=1/filter_attack_time,
+                                offset=filter_min_freq, scale=filter_freq,
+                                waveform=np.array((0,32767), dtype=np.int16))
+
 def note_on( notenum, vel=64):
     print("note_on", notenum, vel)
     #cfg.filter_mod = (vel/127) * 1500
     f = synthio.midi_to_hz(notenum)
-    filt = synthio.Biquad(filter_type, filter_freq, filter_resonance)
+    filt = synthio.Biquad(filter_type, frequency=filter_attack_lfo, Q=filter_resonance)
     notes = (
         synthio.Note( frequency=f, waveform=wave_saw, filter=filt),
         synthio.Note( frequency=f * detune, waveform=wave_saw, filter=filt))
     notes_playing[notenum] = notes
     pts.synth.press(notes)
+    filter_attack_lfo.retrigger()
     pts.led.value = True
 
 def note_off( notenum, vel=0):
@@ -97,10 +104,7 @@ async def synth_updater():
         filt = None
         for notes in notes_playing.values():
             for n in notes:
-                if n:
-                    if filt is None:
-                        filt = synthio.Biquad(filter_type, filter_freq, filter_resonance)
-                    n.filter = filt
+                n.filter.frequency.scale = filter_freq
         await asyncio.sleep(0.01)
 
 async def uart_handler():
