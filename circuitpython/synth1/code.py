@@ -1,5 +1,5 @@
 # synth1 for pico_test_synth2/pico_test_synth
-# 2023 - @todbot / Tod Kurt
+# 2023-2025 - @todbot / Tod Kurt
 #
 # synth1 is a simple demo synth showing off some CircuitPython synthio features.
 #
@@ -12,7 +12,7 @@
 #
 # To install, copy this 'code.py' and 'pico_test_synth.py' to CIRCUITPY
 # and install needed third-party libraries with:
-#  - circup install adafruit_display_text adafruit_displayio_ssd1306
+#  - circup install adafruit_display_text adafruit_displayio_ssd1306 tmidi
 #
 
 import asyncio
@@ -21,13 +21,13 @@ import ulab.numpy as np
 import synthio
 import displayio, terminalio
 from adafruit_display_text import bitmap_label as label
+import tmidi
 
 from pico_test_synth import PicoTestSynthHardware
 
 hw = PicoTestSynthHardware()  # for pico_test_synth2
 #hw = PicoTestSynthHardware(pull_type=digitalio.pull.DOWN)  # for pico_test_synth1
 
-#touch_midi_notes = list(range(48,48+16))
 touch_notes = range(0,16)
 octave = 3
 filter_freq = 8000      # adjusted with knobA
@@ -43,9 +43,11 @@ wave_saw = np.linspace(30000,-30000, num=256, dtype=np.int16)  # default squ is 
 lfo_saw_wave = np.array((0,32767), dtype=np.int16)
 lfo_exp_wave = np.array(32767 * np.linspace(0, 1, num=64, endpoint=True)**2.8, dtype=np.int16)
 # amplitude envelope
-amp_env = synthio.Envelope(attack_level=0.8, sustain_level=0.8, release_time=0.4, attack_time=0.001)
+amp_env = synthio.Envelope(attack_level=0.5, sustain_level=0.5, release_time=0.4, attack_time=0.001)
 hw.synth.envelope = amp_env
 
+# set up midi ports
+midi_uart = tmidi.MIDI(midi_in=hw.midi_uart, midi_out=hw.midi_uart)
 
 # set up info to be displayed
 maingroup = displayio.Group()
@@ -69,7 +71,7 @@ notes_playing = {}  # dict of notes currently playing, value is ((note,note),env
 
         
 def note_on(notenum, vel=64):
-    print("note_on", notenum, vel)
+    print("note_on", notenum, vel, time.monotonic())
     filter_env = synthio.LFO(once=True, rate=1/filter_env_time,
                              offset=filter_min_freq, scale=filter_freq,
                              waveform=lfo_exp_wave)
@@ -146,11 +148,20 @@ async def synth_updater():
                 n.filter.frequency.scale = filter_freq
         await asyncio.sleep(0.01)
 
-async def uart_handler():
+# async def uart_handler():
+#     while True:
+#         while msg := hw.midi_uart.read(3):
+#             print("midi:", [hex(b) for b in msg])
+#         await asyncio.sleep(0)
+
+async def midi_handler():
     while True:
-        while msg := hw.midi_uart.read(3):
-            print("midi:", [hex(b) for b in msg])
-        await asyncio.sleep(0)
+        while msg := midi_uart.receive():
+            if msg.type == tmidi.NOTE_ON and msg.velocity > 0:
+                note_on(msg.note, msg.velocity)
+            if msg.type == tmidi.NOTE_OFF or msg.type == tmidi.NOTE_ON and msg.velocity ==0:
+                note_off(msg.note, msg.velocity)
+        await asyncio.sleep(0.001)
 
 async def debug_printer():
     while True:
@@ -169,7 +180,8 @@ async def debug_printer():
 async def main():  # Don't forget the async!
     task1 = asyncio.create_task(debug_printer())
     task2 = asyncio.create_task(input_handler())
-    task3 = asyncio.create_task(uart_handler())
+    #task3 = asyncio.create_task(uart_handler())
+    task3 = asyncio.create_task(midi_handler())
     task4 = asyncio.create_task(synth_updater())
     await asyncio.gather(task1,task2,task3,task4)
 
