@@ -62,8 +62,8 @@ time.sleep(1)
 text3.text = "pico_test_synth"
 
 filter_types = [('LPF', synthio.FilterMode.LOW_PASS),
-                ('HPF', synthio.FilterMode.HIGH_PASS),
-                ('BPF', synthio.FilterMode.BAND_PASS),]
+                ('BPF', synthio.FilterMode.BAND_PASS),
+                ('HPF', synthio.FilterMode.HIGH_PASS),]
 filter_type_idx = 0
 filter_type = filter_types[filter_type_idx][1]
 
@@ -79,15 +79,15 @@ def note_on(notenum, vel=64):
     filt = synthio.Biquad(filter_type, frequency=filter_env, Q=filter_resonance)
     notes = (synthio.Note(frequency=f, waveform=wave_saw, filter=filt),
              synthio.Note(frequency=f * detune, waveform=wave_saw, filter=filt))
-    notes_playing[notenum] = (notes, filter_env)  # note info
+    notes_playing[notenum] = notes #, filter_env)  # note info
     hw.synth.press(notes)
     filter_env.retrigger()
     hw.led.value = True
 
 def note_off(notenum, vel=0):
     print("note_off", notenum, vel)
-    if note_info := notes_playing[notenum]:
-        hw.synth.release(note_info[0])  # releases all notes
+    if notes := notes_playing[notenum]:
+        hw.synth.release(notes)  # releases all notes
     hw.led.value = False
 
 #
@@ -115,8 +115,7 @@ async def input_handler():
         
         if not button_held:
             filter_freq = knobA_val/65535 * 8000 + 10  # range 10-8010
-            #filter_resonance = knobB_val/65535 * 3.5 + 0.2  # range 0.2-3.2
-            filter_env_time = knobB_val/65535 * 5 + 0.01  # range 0.1 to 5.01
+            filter_env_time = knobB_val/65535 * 3 + 0.01  # range 0.1 to 3.01
         else:
             # only update if knob turned during button hold
             if knob_moved:
@@ -143,16 +142,10 @@ async def synth_updater():
     # for any notes playing, adjust its filter in realtime according to knobs
     while True:
         filt = None
-        for (notes,lfo) in notes_playing.values():
+        for notes in notes_playing.values():
             for n in notes:
                 n.filter.frequency.scale = filter_freq
         await asyncio.sleep(0.01)
-
-# async def uart_handler():
-#     while True:
-#         while msg := hw.midi_uart.read(3):
-#             print("midi:", [hex(b) for b in msg])
-#         await asyncio.sleep(0)
 
 async def midi_handler():
     while True:
@@ -170,7 +163,7 @@ async def debug_printer():
                                               filter_env_time) #hw.knobB//255)
         if text1.text != new_text1:
             text1.text = new_text1
-        text2.text = "oct:%1d   detu:%.3f" % (octave, detune -1 )
+        text2.text = "oct:%1d   %.3f:detu" % (octave, detune-1)
         print(text1.text)
         #if len(notes_playing):
         #    print(list(notes_playing.values())[0][0][0].filter.frequency.phase)
@@ -180,7 +173,6 @@ async def debug_printer():
 async def main():  # Don't forget the async!
     task1 = asyncio.create_task(debug_printer())
     task2 = asyncio.create_task(input_handler())
-    #task3 = asyncio.create_task(uart_handler())
     task3 = asyncio.create_task(midi_handler())
     task4 = asyncio.create_task(synth_updater())
     await asyncio.gather(task1,task2,task3,task4)
