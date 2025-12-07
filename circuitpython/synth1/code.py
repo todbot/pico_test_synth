@@ -3,12 +3,13 @@
 #
 # synth1 is a simple demo synth showing off some CircuitPython synthio features.
 #
-# pico_test_synth controls:
-# - left (A) knob controls filter cutoff
-# - right (B) knob controls filter envelope time
-# - tact button selects filter type: low-pass, high-pass, or band-pass
-# - touch pads trigger notes
-#
+# synth1 controls:
+# - Left (A) knob controls filter cutoff
+# - Right (B) knob controls filter attack envelope time
+# - Tact button selects filter type: low-pass, high-pass, or band-pass
+# - If button is held, knobA controls octave, knobB controls detune
+# - Touch pads trigger notes
+# - Send MIDI in to trigger notes
 #
 # To install, copy this 'code.py' and 'pico_test_synth.py' to CIRCUITPY
 # and install needed third-party libraries with:
@@ -52,14 +53,19 @@ midi_uart = tmidi.MIDI(midi_in=hw.midi_uart, midi_out=hw.midi_uart)
 # set up info to be displayed
 maingroup = displayio.Group()
 hw.display.root_group = maingroup
-text1 = label.Label(terminalio.FONT, text="pico_test_synth...", x=0, y=10)
-text2 = label.Label(terminalio.FONT, text="oct:2     wav:saw", x=0, y=20)
-text3 = label.Label(terminalio.FONT, text="@todbot", x=0, y=30)
-text4 = label.Label(terminalio.FONT, text="synth1", x=0, y=40)
-for t in (text1, text2, text3, text4):
+dy = 12
+texts = [None] * 5
+texts[0] = label.Label(terminalio.FONT, text="frq:1234 LPF 0.9:fatk", x=0, y=dy*1)
+texts[1] = label.Label(terminalio.FONT, text="oct:2      0.000:detu", x=0, y=dy*2)
+texts[2] = label.Label(terminalio.FONT, text="                     ", x=0, y=dy*3)
+texts[3] = label.Label(terminalio.FONT, text="pico_test_synth      ", x=0, y=dy*4)
+texts[4] = label.Label(terminalio.FONT, text="@todbot              ", x=0, y=dy*5-2)
+#                                             012345678901234567890
+for t in texts:
     maingroup.append(t)
 time.sleep(1)
-text3.text = "pico_test_synth"
+texts[4].text = "synth1"
+
 
 filter_types = [('LPF', synthio.FilterMode.LOW_PASS),
                 ('BPF', synthio.FilterMode.BAND_PASS),
@@ -156,26 +162,26 @@ async def midi_handler():
                 note_off(msg.note, msg.velocity)
         await asyncio.sleep(0.001)
 
-async def debug_printer():
+async def screen_updater():
     while True:
-        new_text1 = "frq:%4d %s %.1f:fenv" % (filter_freq,   #hw.knobA//255,
+        new_text0 = "frq:%4d %3s %.1f:fatk" % (filter_freq,
                                               filter_types[filter_type_idx][0],
-                                              filter_env_time) #hw.knobB//255)
-        if text1.text != new_text1:
-            text1.text = new_text1
-        text2.text = "oct:%1d   %.3f:detu" % (octave, detune-1)
-        print(text1.text)
-        #if len(notes_playing):
-        #    print(list(notes_playing.values())[0][0][0].filter.frequency.phase)
+                                              filter_env_time) 
+        new_text1 = "oct:%1d      %.3f:detu" % (octave, detune-1)
+        if texts[0].text != new_text0:
+            texts[0].text = new_text0
+        texts[1].text = new_text1
+        print(new_text0)
         await asyncio.sleep(0.1)
 
 # main coroutine
 async def main():  # Don't forget the async!
-    task1 = asyncio.create_task(debug_printer())
-    task2 = asyncio.create_task(input_handler())
-    task3 = asyncio.create_task(midi_handler())
-    task4 = asyncio.create_task(synth_updater())
-    await asyncio.gather(task1,task2,task3,task4)
+    await asyncio.gather(
+        asyncio.create_task(screen_updater()),
+        asyncio.create_task(input_handler()),
+        asyncio.create_task(midi_handler()),
+        asyncio.create_task(synth_updater()),
+    )
 
 print("hello pico_test_synth synth1")
 asyncio.run(main())
