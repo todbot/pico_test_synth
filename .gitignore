@@ -77,3 +77,12 @@ fp-info-cache
 # Autorouter files (exported from Pcbnew)
 *.dsn
 *.ses
+
+# misc temp files
+*.pages
+*.doc
+*.csv
+production
+*.zip
+*.gz
+*.uf2
