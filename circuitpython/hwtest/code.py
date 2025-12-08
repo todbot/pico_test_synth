@@ -35,6 +35,13 @@ from adafruit_midi.note_on import NoteOn
 from adafruit_midi.note_off import NoteOff
 from adafruit_midi.control_change import ControlChange
 
+# Set which way touch pads work
+# For pico_test_synth2 with Pico2 or Pico, use Pull.UP
+# FOr pico_test_synth, for Pico only, use Pull.DOWN
+
+pull_type = digitalio.Pull.UP    # default for pico_test_synth2
+#pull_type = digitalio.Pull.DOWN  # only option for pico_test_synth original
+
 SAMPLE_RATE = 28000
 BUFFER_SIZE = 4096   # need a bigger buffer when screen updated
 midi_notes = list(range(48,48+16))  # which MIDI notes the touch pads send
@@ -42,9 +49,6 @@ filter_freq = 4000
 filter_resonance = 1.2
 output_volume = 1.0   # change to suit your input device
 
-# set which way touch pads work
-pull_type = digitalio.Pull.UP    # default for pico_test_synth2
-#pull_type = digitalio.Pull.DOWN  # only option for pico_test_synth original
 
 # pin definitions
 sw_pin        = board.GP28

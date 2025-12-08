@@ -3,7 +3,7 @@
 # part of https://github.com/todbot/pico_test_synth
 #
 # libraries needed:
-#  circup install adafruit_debouncer, adafruit_displayio_ssd1306
+#  circup install adafruit_displayio_ssd1306
 #
 # UI fixme:
 # knob "pickup" vs knob "catchup"  (maybe done in app instead)
@@ -11,7 +11,7 @@
 import board, digitalio, pwmio, busio
 import analogio, keypad
 import touchio
-from adafruit_debouncer import Debouncer
+#from adafruit_debouncer import Debouncer
 import audiobusio, audiomixer
 import synthio
 import displayio
@@ -45,7 +45,11 @@ touch_pins = (board.GP0, board.GP1, board.GP2, board.GP3,
 knob_filt = 0.75   # filter amount, higher to filter more, more lag
 
 class Hardware():
-    def __init__(self, sample_rate=SAMPLE_RATE, buffer_size=MIXER_BUFFER_SIZE):
+    # Set which way touch pads work
+    # For pico_test_synth2 with Pico2 or Pico, use Pull.UP
+    # FOr pico_test_synth, for Pico only, use Pull.DOWN
+
+    def __init__(self, pull_type=digitalio.pull.UP, sample_rate=SAMPLE_RATE, buffer_size=MIXER_BUFFER_SIZE):
 
         self.led = pwmio.PWMOut(led_pin)
         self.buttons = keypad.Keys( pins=(sw_pin,), value_when_pressed=False)

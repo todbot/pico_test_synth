@@ -24,7 +24,7 @@ import displayio, terminalio
 from adafruit_display_text import bitmap_label as label
 import tmidi
 
-from pico_test_synth import PicoTestSynthHardware
+from pico_test_synth_hardware import PicoTestSynthHardware
 
 hw = PicoTestSynthHardware()  # for pico_test_synth2
 #hw = PicoTestSynthHardware(pull_type=digitalio.pull.DOWN)  # for pico_test_synth1

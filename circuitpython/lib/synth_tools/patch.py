@@ -95,7 +95,7 @@ class Patch:
     Patch is a serializable data structure for the Instrument's settings.
     """
 
-    wave_selects = generate_wave_selects('/wav')
+    wave_selects = generate_wave_selects(wave_dir='/wavetables')
     filter_types = ("LP", "BP", "HP")
 
     def __init__(self, name='initpatch', wave_type=WaveType.OSC, wave='SAW',
@@ -113,7 +113,7 @@ class Patch:
         self.wave_mix = 0.0  # 0 = wave, 1 = waveB
         self.wave_mix_lfo_amount = 1  # TODFIXME: what is this range
         self.wave_mix_lfo_rate = 0.5  # Hz
-        self.wave_dir = '/wav'
+        self.wave_dir = '/wavetables'
         self.detune = detune
         self.filt_type = filt_type   # allowed values:
         self.filt_f = filt_f

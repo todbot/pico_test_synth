@@ -18,6 +18,7 @@ import synthio
 from synth_tools.patch import Patch, WaveType
 from synth_tools.waves import Waves, Wavetable, lerp
 
+lfo_exp_wave = Waves.lfo_exp_wave()
 
 class Instrument():
     """
@@ -83,7 +84,7 @@ class PolyWaveSynth(Instrument):
         """Loads patch specifics from passed-in Patch object.
            ##### FIXME: no it doesnt: Will reload patch if patch is not specified. """
         self.patch = patch #  self.patch or patch
-        #print("PolyWaveSynth.load_patch:", patch)
+        print("PolyWaveSynth.load_patch:", patch, patch.wave_dir)
 
         self.synth.blocks.clear()   # remove any global LFOs
 
@@ -124,11 +125,12 @@ class PolyWaveSynth(Instrument):
         self.load_patch(self.patch)
 
     def _update_filter(self, osc1, osc2, filt_env):
-
-        filt_amount = self.patch.filt_env_amount
-        filt_fmax = 8000   # TODFIXME: put this & filt_fmin somewhere (instrument?)
-        filt_mod = filt_amount * filt_fmax * (filt_env.value/2)  # 8k/2 = max freq
-        filt_f = min(max(self.patch.filt_f + filt_mod, 60), 8000)
+        # FIXME: rethink this
+        #filt_amount = self.patch.filt_env_amount
+        #filt_fmax = 8000   # TODFIXME: put this & filt_fmin somewhere (instrument?)
+        #filt_mod = filt_amount * filt_fmax * (filt_env.value/2)  # 8k/2 = max freq
+        #filt_f = min(max(self.patch.filt_f + filt_mod, 60), 8000)
+        filt_f = self.patch.filt_f
         osc1.filter.frequency.scale = filt_f
         if osc2:
             osc2.filter.frequency.scale = filt_f
@@ -162,22 +164,18 @@ class PolyWaveSynth(Instrument):
 
     def note_on(self, midi_note, midi_vel=127):
         # amp_env = self.patch.amp_env.make_env()
-        lvl = 0.5 + (midi_vel/127/2)
+        lvl = 0.25 + (midi_vel/127/2)
         amp_env = synthio.Envelope(attack_time = self.patch.amp_env.attack_time,
                                    decay_time = self.patch.amp_env.decay_time,
                                    release_time = self.patch.amp_env.release_time,
                                    attack_level = lvl,
                                    sustain_level = lvl)
 
-        filt_env_wave = Waves.from_ar_times( self.patch.filt_env.attack_time,
-                                             self.patch.filt_env.release_time )
-        filt_env_time = (self.patch.filt_env.attack_time  +
-                         self.patch.filt_env.release_time)
-        filt_env_rate = 1 / filt_env_time  # guaranteed to never be zero
-        # use an LFO to fake an Envelope since we can't get envelope.value
-        # TODFIXME:: make always positve
-        filt_env = synthio.LFO(once=True, scale=self.patch.filt_f, offset=0,
-                               waveform=filt_env_wave, rate=filt_env_rate)
+        filt_min_freq = 100  # fixme
+        filt_env_rate = 1 / (self.patch.filt_env.attack_time + 0.001)
+        filt_env = synthio.LFO(once=True, rate=filt_env_rate,
+                               offset=filt_min_freq, scale=self.patch.filt_f,
+                               waveform=lfo_exp_wave)
 
         filt = synthio.Biquad(self.filter_mode, frequency=filt_env, Q=self.patch.filt_q)
                               
@@ -187,7 +185,7 @@ class PolyWaveSynth(Instrument):
         ## if self.patch.detune:
         osc2 = synthio.Note(frequency=f * self.patch.detune,
                             waveform=self.waveform,
-                            envelope=amp_env)
+                            envelope=amp_env, filter=filt)
 
         self.voices[midi_note] = (osc1, osc2, filt_env)
         self.update()  # update filter and wave before note press
@@ -198,7 +196,10 @@ class PolyWaveSynth(Instrument):
     def note_off(self, midi_note, midi_vel=0):
         (osc1,osc2,filt_env) = self.voices.get(midi_note, (None,None,None))
         #print("note_off:",osc1)
-        if osc1:  # why this check? in case user tries to note_off a non-existant note
+
+        # FIXME: add release envelope to filter
+        
+        if osc1:  # why this check: in case user tries to note_off a non-existant note
             self.synth.release((osc1,osc2))
             # TODFIXME: let filter run on release, check amp_env?
             self.voices.pop(midi_note)

@@ -120,6 +120,16 @@ class Waves:
         return np.array( (0, 32767, 0, -32767), dtype=np.int16)
 
     @staticmethod
+    def lfo_exp_wave(power=2.8):
+        """Expoential up wave for use as part of an LFO / envelope"""
+        return np.array(32767 * np.linspace(0, 1, num=64, endpoint=True)**power, dtype=np.int16)    
+
+    @staticmethod
+    def lfo_exp_wave_fall(power=2.8):
+        """Expoential down wave for use as part of an LFO / envelope"""
+        return np.array(32767 * np.linspace(1, 0, num=64, endpoint=True)**power, dtype=np.int16)    
+
+    @staticmethod
     def from_ar_times(attack_time=1, release_time=1):
         """
         Generate a fake Attack/Release 'Envelope' using an LFO waveform.

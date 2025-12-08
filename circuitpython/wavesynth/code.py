@@ -1,5 +1,5 @@
 import asyncio
-import time
+import time, sys
 import usb_midi
 import displayio, terminalio, vectorio
 
@@ -13,16 +13,16 @@ from synth_tools.patch_saver import load_patches, save_patches, copy
 
 from synthui import SynthUI, splash_screen
 
-# hit the turbo button!
-import microcontroller
-#microcontroller.cpu.frequency = 125_000_000  # normal speed
-microcontroller.cpu.frequency = 250_000_000
-
+if sys.platform == 'RP2040':
+    # if Pico, hit the turbo button!
+    import microcontroller
+    microcontroller.cpu.frequency = 250_000_000
 
 touch_midi_notes = list(range(45, 45+16))  # notes touch keyboard sends FIXME
 
 print("hardware...")
-hw = Hardware()
+hw = Hardware()   # for pico_test_synth2 board
+#hw = Hardware(pull_type=digitalio.Pull.DOWN)  # for pico_test_synth1 board
 splash_screen(hw.display)
 
 time.sleep(1)  # let USB quiet down (when debugging)
@@ -208,7 +208,7 @@ async def midi_handler():
 
 async def ui_handler():
     global patch
-    notes_pressed = [None] * len(hw.touches)
+    notes_pressed = [None] * len(hw.touchins)
     button_held = False
     button_with_touch = False
     p = 0  # which param pair we're looking at
