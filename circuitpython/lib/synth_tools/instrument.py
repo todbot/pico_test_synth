@@ -80,6 +80,16 @@ class PolyWaveSynth(Instrument):
         super().__init__(synth)
         self.load_patch(patch)
 
+    def update_filter_mode(self):
+        if self.patch.filt_type == "LP":
+            self.filter_mode = synthio.FilterMode.LOW_PASS
+        elif self.patch.filt_type == "HP":
+            self.filter_mode = synthio.FilterMode.HIGH_PASS
+        elif self.patch.filt_type == "BP":
+            self.filter_mode = synthio.FilterMode.BAND_PASS
+        else: 
+            self.filter_mode = None
+
     def load_patch(self, patch):
         """Loads patch specifics from passed-in Patch object.
            ##### FIXME: no it doesnt: Will reload patch if patch is not specified. """
@@ -93,15 +103,6 @@ class PolyWaveSynth(Instrument):
         self.wave_lfo = lfo1
         self.synth.blocks.append(lfo1)  # global lfo for wave_lfo
         
-        if self.patch.filt_type == "LP":
-            self.filter_mode = synthio.FilterMode.LOW_PASS
-        elif self.patch.filt_type == "HP":
-            self.filter_mode = synthio.FilterMode.HIGH_PASS
-        elif self.patch.filt_type == "BP":
-            self.filter_mode = synthio.FilterMode.BAND_PASS
-        else: 
-            self.filter_mode = None
-
         # standard two-osc oscillator patch
         if patch.wave_type == WaveType.OSC:
             # self.waveform is our working buffer, overwritten w/ wavemix
@@ -136,7 +137,7 @@ class PolyWaveSynth(Instrument):
             osc2.filter.frequency.scale = filt_f
 
     def update(self):
-        """Update filter envelope and wave-mixing, must be called frequently"""
+        """Update filter envelope and wave-mixing, should be called frequently"""
         p = self.patch
         for (osc1,osc2,filt_env) in self.voices.values():
 
@@ -164,6 +165,8 @@ class PolyWaveSynth(Instrument):
 
     def note_on(self, midi_note, midi_vel=127):
         # amp_env = self.patch.amp_env.make_env()
+        self.update_filter_mode()  # sigh
+        #print("filt_type:", self.filter_mode, self.patch.filt_type)
         lvl = 0.25 + (midi_vel/127/2)
         amp_env = synthio.Envelope(attack_time = self.patch.amp_env.attack_time,
                                    decay_time = self.patch.amp_env.decay_time,
