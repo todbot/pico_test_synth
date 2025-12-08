@@ -126,7 +126,7 @@ async def input_handler():
             # only update if knob turned during button hold
             if knob_moved:
                 octave = int(knobA_val/65535 * 5)
-                detune = 1 + (knobB_val/65535) * 0.05
+                detune = 1 + (knobB_val/65535) * 0.5
 
         # read tact button
         if button := hw.check_key():
