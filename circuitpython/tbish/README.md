@@ -3,6 +3,8 @@
 
 A TB-303 inspired monophonic bass synth.
 
+Video demo: https://www.youtube.com/watch?v=1AflpXbEIno
+
 Current code in here is a technology demo. 
 There's no way to edit patterns or play it via MIDI. 
 
