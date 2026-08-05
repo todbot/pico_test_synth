@@ -2,5 +2,7 @@ asyncio
 adafruit_wave
 adafruit_displayio_ssd1306
 adafruit_display_text
+adafruit_midi
+tmidi
 lib/pico_test_synth
 lib/synth_tools
