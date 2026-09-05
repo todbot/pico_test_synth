@@ -4,5 +4,6 @@ adafruit_displayio_ssd1306
 adafruit_display_text
 adafruit_midi
 tmidi
+synthtools
 lib/pico_test_synth
 lib/synth_tools
