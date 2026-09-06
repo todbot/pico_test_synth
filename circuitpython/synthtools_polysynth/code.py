@@ -3,9 +3,13 @@
 #
 # synthtools_polysynth -- a playable SubtractiveSynth with a screen
 #
-# For a pico_test_synth2. Copy the CONTENTS of this folder flat onto
-# CIRCUITPY -- code.py, synth_setup_pts.py, synth_ui_pts.py -- plus the
-# synthtools package.
+# For a pico_test_synth2. Copy this code.py onto CIRCUITPY, plus the
+# repo's circuitpython/lib/ (which carries the shared synth_setup_pts.py
+# and synth_ui_pts.py this imports), plus the synthtools package.
+#
+# Those two modules used to live in this folder; they are now shared with
+# tbish2/ and the other synthtools demos. CircuitPython puts lib/ on
+# sys.path, so the import lines below are unchanged.
 #
 # 16 touch pads are a chromatic keyboard, two pots edit 14 synth
 # parameters two at a time, and a 128x64 OLED shows which two.

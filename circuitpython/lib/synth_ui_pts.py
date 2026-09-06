@@ -3,6 +3,9 @@
 #
 # synth_ui_pts.py -- two-knob parameter display for a 128x64 mono OLED
 #
+# Canonical copy, shared by the synthtools-based demos; see
+# lib/synth_setup_pts.py for why this lives in lib/.
+#
 # Shows the two params the pots are currently editing, as name + value +
 # bar, plus a footer with the page number, the octave, and whether each
 # pot has "picked up" its parameter yet.

@@ -6,6 +6,12 @@
 # The "pts" variant of synth_setup.py: same audio bring-up, plus the
 # 16 touch pads, the I2C OLED and the UART MIDI pins.
 #
+# This is the CANONICAL copy, shared by every synthtools-based demo in
+# this repo (synthtools_polysynth/, tbish2/, ...). It lives in lib/, which
+# CircuitPython puts on sys.path, so demos still say
+# `from synth_setup_pts import ...` with no path prefix. Edit it here, not
+# in a demo folder.
+#
 # Imported, not run. Audio and inputs are set up at import; the display
 # and touch pads are opt-in, since each pulls in libraries and RAM you
 # may not want:

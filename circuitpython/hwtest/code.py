@@ -14,9 +14,9 @@
 # - asyncio
 # - adafruit_displayio_ssd1306
 # - adafruit_display_text
-# - adafruit_midi
+# - tmidi
 # Install them all with:
-#   circup install asyncio adafruit_displayio_ssd1306 adafruit_display_text adafruit_midi
+#   circup install asyncio adafruit_displayio_ssd1306 adafruit_display_text tmidi
 #
 #
 import asyncio
@@ -30,10 +30,7 @@ import adafruit_displayio_ssd1306
 from adafruit_display_text import bitmap_label as label
 import touchio
 import usb_midi
-import adafruit_midi
-from adafruit_midi.note_on import NoteOn
-from adafruit_midi.note_off import NoteOff
-from adafruit_midi.control_change import ControlChange
+import tmidi
 
 # Set which way touch pads work
 # For pico_test_synth2 with Pico2 or Pico, use Pull.UP
@@ -87,8 +84,8 @@ for pin in touch_pins:
 print("starting up...")
 i2c = busio.I2C(scl=i2c_scl_pin, sda=i2c_sda_pin, frequency=1_000_000)
 uart = busio.UART(rx=uart_rx_pin, tx=uart_tx_pin, baudrate=31250, timeout=0.001)
-midi_uart = adafruit_midi.MIDI(midi_in=uart, midi_out=uart)
-midi_usb = adafruit_midi.MIDI(midi_in=usb_midi.ports[0], midi_out=usb_midi.ports[1])
+midi_uart = tmidi.MIDI(midi_in=uart, midi_out=uart)
+midi_usb = tmidi.MIDI(midi_in=usb_midi.ports[0], midi_out=usb_midi.ports[1])
 
 dw,dh = 128, 64
 display_bus = i2cdisplaybus.I2CDisplayBus(i2c, device_address=0x3c)
@@ -177,14 +174,14 @@ async def input_handler():
                 print("\t\ttouch press  ",i)
                 midi_note = midi_notes[i]
                 note_on(midi_note)
-                msg = NoteOn(midi_note, velocity=100)
+                msg = tmidi.Message(tmidi.NOTE_ON, midi_note, 100)
                 midi_usb.send( msg )
                 midi_uart.send( msg )
             elif not t and lt:
                 print("\t\ttouch release",i)
                 midi_note = midi_notes[i]
                 note_off(midi_note)
-                msg = NoteOff(midi_note, velocity=0)
+                msg = tmidi.Message(tmidi.NOTE_OFF, midi_note, 0)
                 midi_usb.send( msg )
                 midi_uart.send( msg )       
 
@@ -203,9 +200,11 @@ async def input_handler():
 async def midi_handler():
     while True:
         while msg := midi_usb.receive() or midi_uart.receive():
-            if isinstance(msg, NoteOn) and msg.velocity != 0:
+            # tmidi returns one Message type and tags it with .type,
+            # rather than a class per message kind
+            if msg.type == tmidi.NOTE_ON and msg.velocity != 0:
                 note_on(msg.note)
-            elif isinstance(msg,NoteOff) or isinstance(msg,NoteOn) and msg.velocity==0:
+            elif msg.type in (tmidi.NOTE_OFF, tmidi.NOTE_ON):
                 note_off(msg.note)
         await asyncio.sleep(0.001)
 

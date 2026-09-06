@@ -1,9 +1,22 @@
+# Third-party libraries, installable with:
+#   circup install -r requirements.txt
+#
+# The two libraries that live in this repo -- lib/pico_test_synth and
+# lib/synth_tools -- used to be listed here too, but circup cannot resolve
+# a local path. Copy lib/ to CIRCUITPY/lib yourself; see README.md.
+
 asyncio
 adafruit_wave
 adafruit_displayio_ssd1306
 adafruit_display_text
+adafruit_debouncer
+
+# Two MIDI libraries, on purpose:
+#   adafruit_midi  hwtest/ only
+#   tmidi          everything newer
 adafruit_midi
 tmidi
+
+# github.com/todbot/CircuitPython_SynthTools -- the synth engine used by
+# tbish2/, synthtools_polysynth/ and the synthtools_* demos.
 synthtools
-lib/pico_test_synth
-lib/synth_tools

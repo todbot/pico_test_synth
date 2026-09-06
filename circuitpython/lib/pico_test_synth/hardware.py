@@ -11,10 +11,9 @@
 import board, digitalio, pwmio, busio
 import analogio, keypad
 import touchio
-#from adafruit_debouncer import Debouncer
 import audiobusio, audiomixer
 import synthio
-import displayio
+import displayio, i2cdisplaybus
 import adafruit_displayio_ssd1306
 
 
@@ -49,7 +48,7 @@ class Hardware():
     # For pico_test_synth2 with Pico2 or Pico, use Pull.UP
     # FOr pico_test_synth, for Pico only, use Pull.DOWN
 
-    def __init__(self, pull_type=digitalio.pull.UP, sample_rate=SAMPLE_RATE, buffer_size=MIXER_BUFFER_SIZE):
+    def __init__(self, pull_type=digitalio.Pull.UP, sample_rate=SAMPLE_RATE, buffer_size=MIXER_BUFFER_SIZE):
 
         self.led = pwmio.PWMOut(led_pin)
         self.buttons = keypad.Keys( pins=(sw_pin,), value_when_pressed=False)
@@ -58,13 +57,12 @@ class Hardware():
         self.knobA = self._knobA.value
         self.knobB = self._knobB.value
 
-        self.touchins = []  # for raw_value
-        self.touches = []   # for debouncer
+        self.touchins = []  
         for pin in touch_pins:
-            touchin = touchio.TouchIn(pin)
+            touchin = touchio.TouchIn(pin, pull_type)
             touchin.threshold = int(touchin.threshold * 1.1)  # noise protec
             self.touchins.append(touchin)
-            self.touches.append(Debouncer(touchin))
+        self.last_touches = [touch.value for touch in self.touchins]
 
         # make power supply less noisy on real Picos
         self.pwr_mode = digitalio.DigitalInOut(pico_pwr_pin)
@@ -75,7 +73,7 @@ class Hardware():
 
         displayio.release_displays()
         i2c = busio.I2C(scl=i2c_scl_pin, sda=i2c_sda_pin, frequency=1_000_000)
-        display_bus = displayio.I2CDisplay(i2c, device_address=0x3c)
+        display_bus = i2cdisplaybus.I2CDisplayBus(i2c, device_address=0x3c)
         self.display = adafruit_displayio_ssd1306.SSD1306(display_bus,
                                                           width=DW, height=DH,
                                                           rotation=180,
@@ -97,6 +95,9 @@ class Hardware():
     def set_volume(self,v):
         self.mixer.voice[0].level = v
 
+    def get_volume(self):
+        return self.mixer.voice[0].level
+
     def check_button(self):
         return self.buttons.events.get()
 
@@ -115,21 +116,23 @@ class Hardware():
         # filter noise
         self.knobA = knob_filt * self.knobA + (1-knob_filt)*(self._knobA.value)
         self.knobB = knob_filt * self.knobB + (1-knob_filt)*(self._knobB.value)
-        return (self.knobA//255, self.knobB/255)  # admit knobs are only 8-bit
+        return (self.knobA/255, self.knobB/255)  # admit knobs are only 8-bit
 
     def check_touch(self):
-        """Check the four touch inputs, return keypad-like Events"""
+        """Check the touch inputs, return keypad-like Events"""
         events = []
-        for i, touch in enumerate(self.touches):
-            touch.update()
-            if touch.rose:
+        for i,touch in enumerate(self.touchins):
+            t = touch.value
+            lt = self.last_touches[i]
+            self.last_touches[i] = t
+            if t and not lt:  # press
                 events.append(keypad.Event(i,True))
-            elif touch.fell:
+            if not t and lt:  # release
                 events.append(keypad.Event(i,False))
         return events
 
     def check_touch_hold(self, hold_func):
-        for i in 0,1,2,3:
-            if self.touches[i].value:  # pressed
+        for i in range(len(self.touchins)):
+            if self.touchins[i].value:  # pressed
                 v = self.touchins[i].raw_value - self.touchins[i].threshold
                 hold_func(i, v)

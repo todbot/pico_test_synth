@@ -1,153 +1,218 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 Tod Kurt
+# SPDX-License-Identifier: MIT
+#
+# wavesynth -- wavetable polysynth with saveable patches, for
+# pico_test_synth / pico_test_synth2
+#
+# Ported from the vendored synth_tools library onto synthtools:
+#
+#   synth_tools.instrument.PolyWaveSynth -> synthtools.WavetableSynth
+#   synth_tools.patch.Patch              -> synthtools.Patch
+#   synth_tools.patch_saver              -> synthtools.load/save_patches
+#   winterbloom_smolmidi                 -> tmidi
+#
+# The UI (synthui.py, gauge_cluster.py, param_scaler.py, param.py) stays
+# local: synthtools/ui/ has no __init__.py and is not shipped by
+# `circup install synthtools`, so it cannot be imported on-device.
+#
+# WHAT CHANGED AUDIBLY. The old PolyWaveSynth blended two oscillators
+# (waveA/waveB) with an LFO on the mix. synthtools has no equivalent --
+# SubtractiveSynth is one wave plus detune, WavetableSynth is
+# wave_pos/wave_file -- so this is now purely a wavetable synth, which is
+# what the name and the 12 WAVs in wavetables/ always suggested:
+#
+#   WaveMix  -> WavePos    position within the wavetable, morphs live
+#   WaveSel  -> WaveSel    which .WAV, instead of "osc:SAW/SQU"
+#   WavLFO   -> FiltLFO    the motion knobs now drive the FILTER LFO,
+#   WavRate  -> FiltRate   since there is no wave-mix LFO to drive
+#
+# Patches are read from and written to PATCHES_FILE below -- a NEW file.
+# The old saved_patches.json uses the previous schema (wave_type, waveA,
+# waveB, nested amp_env objects) and is left on disk untouched rather than
+# converted, since the wave fields have no meaning here any more.
+#
+# Libraries needed:
+#   circup install synthtools tmidi adafruit_wave \
+#                  adafruit_display_text adafruit_displayio_ssd1306
+#
+# Copy lib/ to CIRCUITPY/lib, and the contents of this folder (including
+# wavetables/) to the CIRCUITPY root.
+
 import asyncio
-import time, sys
+import os
+import sys
+import time
+
+import tmidi
 import usb_midi
-import displayio, terminalio, vectorio
 
+from param import ParamChoice, ParamRange
 from pico_test_synth.hardware import Hardware
-
-from synth_tools.patch import Patch
-from synth_tools.instrument import PolyWaveSynth
-from synth_tools.param import ParamRange, ParamChoice
-import synth_tools.winterbloom_smolmidi as smolmidi
-from synth_tools.patch_saver import load_patches, save_patches, copy
-
+from synthtools import Patch, WavetableSynth, load_patches, save_patches
 from synthui import SynthUI, splash_screen
 
-if sys.platform == 'RP2040':
-    # if Pico, hit the turbo button!
+if sys.platform == "RP2040":
     import microcontroller
+
     microcontroller.cpu.frequency = 250_000_000
 
-touch_midi_notes = list(range(45, 45+16))  # notes touch keyboard sends FIXME
+PATCHES_FILE = "/wavesynth_patches.json"
+WAVE_DIR = "/wavetables"
+touch_midi_notes = list(range(45, 45 + 16))
 
 print("hardware...")
-hw = Hardware()   # for pico_test_synth2 board
-#hw = Hardware(pull_type=digitalio.Pull.DOWN)  # for pico_test_synth1 board
+hw = Hardware()  # for pico_test_synth2; pass Pull.DOWN for pico_test_synth1
 splash_screen(hw.display)
-
 time.sleep(1)  # let USB quiet down (when debugging)
 
-# let's get the midi going
-midi_usb_in = smolmidi.MidiIn(usb_midi.ports[0])
-midi_uart_in = smolmidi.MidiIn(hw.midi_uart)
+midi_usb = tmidi.MIDI(midi_in=usb_midi.ports[0])
+midi_uart = tmidi.MIDI(midi_in=hw.midi_uart, midi_out=hw.midi_uart)
 
-patches = load_patches()
-print("loaded ", len(patches), "patches")
-if not patches:
+
+def wave_files():
+    """The wavetable WAVs on the device, as full paths."""
+    try:
+        names = sorted(f for f in os.listdir(WAVE_DIR) if f.endswith(".WAV"))
+    except OSError:
+        names = []
+    if not names:
+        raise RuntimeError("no .WAV wavetables found in " + WAVE_DIR)
+    return [WAVE_DIR + "/" + n for n in names]
+
+
+WAVES = wave_files()
+FILTER_TYPES = ("LPF", "HPF", "BPF", "NOTCH")
+
+
+def default_patches():
+    """Nine starting patches, spread across the wavetables on the card."""
+    out = []
+    for i in range(9):
+        out.append(
+            Patch(
+                name="patch%d" % (i + 1),
+                synth_type="wavetable",
+                wave_file=WAVES[i % len(WAVES)],
+                wave_pos=0,
+                filt_type="LPF",
+                filt_f=2345,
+                filt_q=1.1,
+                amp_env=[0.01, 0.1, 0.9, 0.5],
+                fenv_amount=1500,
+                fenv_attack=0.2,
+                fenv_release=0.6,
+            )
+        )
+    return out
+
+
+try:
+    patches = load_patches(PATCHES_FILE)
+except (OSError, ValueError):
+    patches = []
+if patches:
+    print("loaded", len(patches), "patches")
+else:
     print("no patches, making up some")
-    patch1 = Patch('one')
-    patch1.amp_env.attack_time = 0.01
-    patch1.amp_env.release_time = 0.5
-    patch1.filt_env.attack_time = 1.1
-    patch1.filt_env.release_time = 0.8
-    patch1.filt_f = 2345
-    patch1.filt_q = 1.7
-    patch1.waveB = 'SQU'
-    patch1.wave_mix_lfo_amount = 0.3
-    patch1.detune = 1.01
-    patches = [patch1, Patch('two'), Patch('three'), Patch('four'),
-               Patch('five'), Patch('six'), Patch('seven'),
-               Patch('eight'), Patch('nine')]
+    patches = default_patches()
+
 key_number_to_patch = (1, 0, 2, 0, 3, 4, 0, 5, 0, 6, 0, 7, 8, 0, 9, 0)
 
 patch = patches[0]
-inst = PolyWaveSynth(hw.synth, patch)
 
-# some utilities for the Params below
-wave_selects = Patch.wave_selects
-filter_types = Patch.filter_types
+# A synthio.Biquad above Nyquist is undefined, and Hardware runs the mixer
+# at 25600 Hz. Set on the SUBCLASS and BEFORE constructing -- the clamp is
+# baked into the shared block graph at build time.
+WavetableSynth.FILT_F_MAX = hw.mixer.sample_rate * 0.45
 
-def update_wave_select(wave_select_idx):
-    wave_select = Patch.wave_selects[wave_select_idx]
-    inst.patch.set_by_wave_select(wave_select)
-    inst.reload_patch()
-    
-def get_wave_select_idx():
-    wave_select = getattr(patch, "wave_select")()  # note: this is a func
-    # FIXME: this changes the patch
-    if wave_select not in Patch.wave_selects:
-        print("patch:'%s' wave_select '%s' not in wave_selects" % (patch.name, wave_select))
-        wave_select = Patch.wave_selects[0]
-        patch.set_by_wave_select(wave_select)
-        print("patch: new wave_select:",patch.wave_select())
-    idx = Patch.wave_selects.index(wave_select)
-    #print("get_wave_select_idx:",idx)
-    return idx
+synth = WavetableSynth(hw.synth, patch)
+octave = 0  # app state, not a synth parameter
 
-# set of parameter pairs adjustable by the user
+
+def set_octave(v):
+    global octave
+    octave = int(v)
+
+
+def wave_idx():
+    try:
+        return WAVES.index(synth.wave_file)
+    except ValueError:
+        return 0
+
+
+# --- the 14 parameters, in gauge order -----------------------------------
+# IMPORTANT: these setters and getters talk to the SYNTH, not the patch.
+# synthtools treats a Patch as inert data -- a property setter never writes
+# back to it -- so reading the patch here would show stale values and
+# saving without synth.save_patch() would store the knob positions the
+# patch was LOADED with. See save_patches_action().
 params = (
     # Pair 0
-    ParamRange("FiltFreq", "filter frequency", 1234, "%4d", 60, 8000,
-               setter=lambda x: setattr(patch, "filt_f", x),
-               getter=lambda: getattr(patch, "filt_f")),
-    ParamRange("FilterRes", "filter resonance", 0.7, "%1.2f", 0.1, 2.5,
-               setter=lambda x: setattr(patch, "filt_q", x),
-               getter=lambda: getattr(patch, "filt_q")),
-    
-    # Pair 1
-    ParamRange("WaveMix", "wave mix", 0.2, "%.2f", 0.0, 0.99,
-               setter=lambda x: setattr(patch, "wave_mix", x),
-               getter=lambda: getattr(patch, "wave_mix")),
-    ParamChoice("WaveSel", "wave select", 0, wave_selects,
-                setter=lambda x: update_wave_select(x),
-                getter=lambda: get_wave_select_idx()),
-                #getter=lambda: wave_selects.index(getattr(patch, "wave_select")()) ),
-    
+    ParamRange("FiltFreq", "filter frequency", synth.filt_f, "%4d", 60, 8000,
+               setter=lambda x: setattr(synth, "filt_f", x),
+               getter=lambda: synth.filt_f),
+    ParamRange("FilterRes", "filter resonance", synth.filt_q, "%1.2f", 0.1, 8.0,
+               setter=lambda x: setattr(synth, "filt_q", x),
+               getter=lambda: synth.filt_q),
+
+    # Pair 1 -- was WaveMix / WaveSel over waveA+waveB
+    ParamRange("WavePos", "wavetable position", synth.wave_pos, "%1.2f", 0, 8,
+               setter=lambda x: setattr(synth, "wave_pos", x),
+               getter=lambda: synth.wave_pos),
+    ParamChoice("WaveSel", "wavetable file", wave_idx(),
+                [w.split("/")[-1].replace(".WAV", "") for w in WAVES],
+                setter=lambda x: setattr(synth, "wave_file", WAVES[int(x)]),
+                getter=wave_idx),
+
     # Pair 2
-    ParamRange("WavLFO", "wave lfo amount", 0.3, "%2.1f", 0.0, 5,
-               setter=lambda x: setattr(patch, "wave_mix_lfo_amount", x),
-               getter=lambda: getattr(patch, "wave_mix_lfo_amount")),
-    ParamRange("WavRate", "wave lfo rate", 0.3, "%2.1f", 0.0, 5,
-               setter=lambda x: setattr(patch, "wave_mix_lfo_rate", x),
-               getter=lambda: getattr(patch, "wave_mix_lfo_rate")
-               ),
-    
+    ParamRange("AmpAtk", "amp attack time", synth.attack_time, "%1.2f", 0.0, 3.0,
+               setter=lambda x: setattr(synth, "attack_time", x),
+               getter=lambda: synth.attack_time),
+    ParamRange("AmpRls", "amp release time", synth.release_time, "%1.2f", 0.0, 3.0,
+               setter=lambda x: setattr(synth, "release_time", x),
+               getter=lambda: synth.release_time),
+
     # Pair 3
-    ParamRange("AmpAtk", "attack time", 0.1, "%1.2f", 0.0, 3.0,
-               setter=lambda x: setattr(patch.amp_env,"attack_time", x),
-               getter=lambda: getattr(patch.amp_env, "attack_time")
-               ),
-    ParamRange("AmpRls", "release time", 0.3, "%1.2f", 0.0, 3.0,
-               setter=lambda x: setattr(patch.amp_env,"release_time", x),
-               getter=lambda: getattr(patch.amp_env, "release_time")
-               ),
-    
-    # Pair 4
-    ParamRange("FiltAtk", "filter attack ", 1.1, "%1.2f", 0.01, 3.0,
-               setter=lambda x: setattr(patch.filt_env, "attack_time", x),
-               getter=lambda: getattr(patch.filt_env, "attack_time")
-               ),
-    ParamRange("FiltRls", "filter release", 0.8, "%1.2f", 0.01, 3.0,
-               setter=lambda x: setattr(patch.filt_env, "release_time", x),
-               getter=lambda: getattr(patch.filt_env, "release_time")
-               ),
+    ParamRange("FiltAtk", "filter env attack", synth.fenv_attack, "%1.2f", 0.01, 3.0,
+               setter=lambda x: setattr(synth, "fenv_attack", x),
+               getter=lambda: synth.fenv_attack),
+    ParamRange("FiltRls", "filter env release", synth.fenv_release, "%1.2f", 0.01, 3.0,
+               setter=lambda x: setattr(synth, "fenv_release", x),
+               getter=lambda: synth.fenv_release),
 
-    # Pair 5
-    ParamRange("FiltEnv", "filter env amount", 0, "%.2f", -0.99, 0.99,
-               setter=lambda x: setattr(patch, "filt_env_amount", x),
-               #getter=lambda: getattr(patch, "filt_env_amount")
-               ),
-    ParamChoice("FiltType", "filter type", 0, filter_types,
-                setter=lambda x: setattr(patch,"filt_type",filter_types[x]),
-                #getter=lambda: getattr(patch, "filt_type")
-                ),
-    
-    # Pair 6
+    # Pair 4 -- both of these had their getters commented out before, so
+    # the gauges never reflected a loaded patch. They do now.
+    ParamRange("FiltEnv", "filter env amount", synth.fenv_amount, "%4d", -4000, 6000,
+               setter=lambda x: setattr(synth, "fenv_amount", x),
+               getter=lambda: synth.fenv_amount),
+    ParamChoice("FiltType", "filter type", 0, FILTER_TYPES,
+                setter=lambda x: setattr(synth, "filt_type", FILTER_TYPES[int(x)]),
+                getter=lambda: FILTER_TYPES.index(synth.filt_type)),
+
+    # Pair 5 -- was the wave-mix LFO, now the filter LFO
+    ParamRange("FiltLFO", "filter lfo amount", synth.filt_lfo_amount, "%4d", 0, 4000,
+               setter=lambda x: setattr(synth, "filt_lfo_amount", x),
+               getter=lambda: synth.filt_lfo_amount),
+    ParamRange("FiltRate", "filter lfo rate", synth.filt_lfo_rate, "%2.1f", 0.0, 8.0,
+               setter=lambda x: setattr(synth, "filt_lfo_rate", x),
+               getter=lambda: synth.filt_lfo_rate),
+
+    # Pair 6 -- neither of these is a synth parameter
     ParamRange("Octave", "octave range", 0, "%d", -3, 2,
-               setter=lambda x: setattr(patch, "octave", int(x)),
-               getter=lambda: getattr(patch, "octave")
-               ),
-    ParamRange("Volume", "volume", 0.7, "%1.2f", 0.1, 1.0,
-               setter=lambda x: hw.set_volume(min(max(x,0),1))),
-
-
+               setter=set_octave,
+               getter=lambda: octave),
+    ParamRange("Volume", "volume", hw.get_volume(), "%1.2f", 0.1, 1.0,
+               setter=lambda x: hw.set_volume(min(max(x, 0), 1)),
+               getter=hw.get_volume),
 )
 
+
 def update_params():
-    """Get the params set to the values they represent"""
+    """Pull every param's value back from what it represents."""
     for p in params:
-        #print("updating",p)
         p.update()
+
 
 def save_patches_action():
     v = hw.get_volume()
@@ -155,122 +220,117 @@ def save_patches_action():
     time.sleep(0.2)
     synthui.set_patch_name("Saving...")
     hw.display.refresh()
-    save_patches(patches)
+    # The knobs wrote the SYNTH, not the patch -- synthtools keeps a Patch
+    # inert on purpose. Without this the file gets the values the patch was
+    # loaded with, and every save is a no-op.
+    synth.save_patch()
+    try:
+        save_patches(patches, PATCHES_FILE)
+    except OSError:
+        print("could not write", PATCHES_FILE, "-- is boot.py remounting /?")
     synthui.set_patch_name(patch.name)
     hw.set_volume(v)
+
 
 def load_patches_action(patchidx):
     global patch
     patch = patches[patchidx]
-    update_params()
+    synth.all_notes_off()
+    synth.load_patch(patch)
+    update_params()  # read the new values back off the synth
     synthui.set_patch_name(patch.name)
     synthui.refresh_gauge_cluster()
-    inst.note_off_all()
-    inst.load_patch( patch )
-    print("loaded patch #",patchidx)
-
+    print("loaded patch #", patchidx)
 
 
 update_params()
-knobA, knobB = hw.read_pots()  # returns 0-255 values
+knobA, knobB = hw.read_pots()
 synthui = SynthUI(hw.display, params, knobA, knobB)
 synthui.set_patch_name(patch.name)
 
 
-async def instrument_updater():
-    while True:
-        inst.update()
-        await asyncio.sleep(0.01)  # as fast as is reasonable
-        
 async def midi_handler():
     while True:
-        while msg := midi_usb_in.receive() or midi_uart_in.receive():
-            if msg.type == smolmidi.NOTE_ON:
-                inst.note_on(msg.data[0], msg.data[1])
-                hw.set_led(0xff00ff)
-            elif msg.type == smolmidi.NOTE_OFF:
-                inst.note_off(msg.data[0], msg.data[1])
+        while msg := (midi_usb.receive() or midi_uart.receive()):
+            if msg.type == tmidi.NOTE_ON and msg.velocity:
+                synth.note_on(msg.note, msg.velocity)
+                hw.set_led(0xFF00FF)
+            elif msg.type in (tmidi.NOTE_OFF, tmidi.NOTE_ON):
+                synth.note_off(msg.note)
                 hw.set_led(0x000000)
-            elif msg.type == smolmidi.CC:
-                ccnum = msg.data[0]
-                ccval = msg.data[1]
-                # hw.set_led(ccval)
-                # if ccnum == 71:  # "sound controller 1"
-                #     new_wave_mix = ccval/127
-                #     print("wave_mix:", new_wave_mix)
-                #     inst.patch.wave_mix = new_wave_mix
-                # elif ccnum == 1:  # mod wheel
-                #     inst.patch.wave_mix_lfo_amount = ccval/127 * 50
-                #     # inst.patch.wave_mix_lfo_rate = msg.value/127 * 5
-                # elif ccnum == 74:  # filter cutoff
-                #     inst.patch.filt_f = ccval/127 * 8000
+            elif msg.type == tmidi.CC:
+                # tmidi names the note bytes but not the CC ones
+                if msg.data0 == 74:  # filter cutoff
+                    synth.filt_f = 60 + msg.data1 / 127 * 7940
+                elif msg.data0 == 1:  # mod wheel -> wavetable position
+                    synth.wave_pos = msg.data1 / 127 * 8
+                elif msg.data0 in (120, 123):
+                    synth.all_notes_off()
         await asyncio.sleep(0.01)
 
+
 async def ui_handler():
-    global patch
     notes_pressed = [None] * len(hw.touchins)
     button_held = False
     button_with_touch = False
     p = 0  # which param pair we're looking at
-    
+
     while True:
         hw.display.refresh()
-    
+
         knobA, knobB = hw.read_pots()
-        synthui.setA( knobA )
-        synthui.setB( knobB )
-    
+        synthui.setA(knobA)
+        synthui.setB(knobB)
+
         if button := hw.check_button():
             if button.pressed:
                 button_held = True
             if button.released:
-                # only advance UI if not doing patch loading gesture
+                # only advance the UI if not doing a patch-load gesture
                 if not button_with_touch:
-                    p = (p+1) % (synthui.num_params//2)  # go to next param pair
+                    p = (p + 1) % (synthui.num_params // 2)
                     synthui.select_pair(p)
                     print("select param pair:", p)
                 button_held = False
                 button_with_touch = False
-                
+
         if touches := hw.check_touch():
             for touch in touches:
-                
                 if touch.pressed:
-                    if button_held:  # load a patch
+                    if button_held:  # load or save a patch
                         button_with_touch = True
                         patchidx = key_number_to_patch[touch.key_number]
-                        print("key:", touch.key_number, "patch:", patchidx)
-                        if touch.key_number == 15:  # make this be save key
-                            # Save!
+                        if touch.key_number == 15:  # save key
                             save_patches_action()
                         elif patchidx > 0:
-                            # Load!
-                            load_patches_action(patchidx-1)
-                            
+                            load_patches_action(patchidx - 1)
                     else:  # trigger a note
                         button_with_touch = False
-                        midi_note = touch_midi_notes[touch.key_number]
-                        midi_note += (inst.patch.octave*12)
+                        midi_note = touch_midi_notes[touch.key_number] + octave * 12
                         notes_pressed[touch.key_number] = midi_note
-                        inst.note_on(midi_note)
-                        hw.set_led(0xff00ff)
+                        synth.note_on(midi_note)
+                        hw.set_led(0xFF00FF)
 
-                if touch.released:
-                    if button_with_touch:
-                        pass
-                    else:
-                        midi_note = notes_pressed[touch.key_number]
-                        inst.note_off(midi_note)
-                        hw.set_led(0)
+                if touch.released and not button_with_touch:
+                    midi_note = notes_pressed[touch.key_number]
+                    if midi_note is not None:
+                        synth.note_off(midi_note)
+                        notes_pressed[touch.key_number] = None
+                    hw.set_led(0)
         await asyncio.sleep(0.01)
-    
+
 
 print("--- pico_test_synth wavesynth ready ---")
 
-async def main():
-    task1 = asyncio.create_task(ui_handler())
-    task2 = asyncio.create_task(midi_handler())
-    task3 = asyncio.create_task(instrument_updater())
-    await asyncio.gather(task1, task2, task3)
-asyncio.run(main())
 
+async def main():
+    # PolyWaveSynth needed an instrument_updater() task to drive its
+    # wave-mix LFO in Python. WavetableSynth has nothing to poll: wave_pos
+    # is written straight into the shared buffer, so that task is gone.
+    await asyncio.gather(
+        asyncio.create_task(ui_handler()),
+        asyncio.create_task(midi_handler()),
+    )
+
+
+asyncio.run(main())
