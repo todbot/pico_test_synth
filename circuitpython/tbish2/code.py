@@ -9,13 +9,15 @@
 # done: an accent now raises resonance (accent_q) and cutoff
 # (accent_cutoff) as well as level, and a slide has a real slide_time.
 #
-# For a pico_test_synth / pico_test_synth2. Copy this code.py and
-# tbish_ui.py onto CIRCUITPY, plus the repo's circuitpython/lib/ (for
-# synth_setup_pts.py) and the synthtools package.
+# For a pico_test_synth / pico_test_synth2. Copy code.py, tbish_ui.py
+# and boot.py onto the CIRCUITPY root, then, from circuitpython/:
 #
-# Libraries needed:
-#   circup install synthtools adafruit_display_text \
-#                  adafruit_displayio_ssd1306 adafruit_debouncer
+#   circup install -r requirements.txt
+#
+# That pulls the synthtools package and the local lib/pico_test_synth
+# board package -- circup installs from a path as readily as from the
+# bundle. tbish2 draws its own screen (tbish_ui.py), so it never imports
+# pico_test_synth.ui.
 #
 # NEEDS a build with audiofilters and audiodelays for the drive and delay
 # knobs and the 24 dB filter. Without them the demo still runs -- the
@@ -25,9 +27,10 @@
 #   hold the button  -> play / pause (and save the knobs to /tbish2.json)
 #   touch a pad      -> transpose the sequence, -7..+8 semitones
 #
-# The pots use ParamSet's PICKUP mode: after changing page a pot does
-# nothing until it passes the value the parameter already has, so the
-# sound never jumps when you turn one.
+# The pots use scaled ("catch-up") takeover: a turn ALWAYS moves the
+# value, by an amount scaled so knob and value converge and reach the
+# ends together. No dead travel after a page turn -- see
+# ParamSet.update_knobs_scale() in synthtools.
 
 import os
 import time
@@ -38,17 +41,7 @@ import microcontroller
 # per-step latency from 10 ms down to 6 ms.
 microcontroller.cpu.frequency = 200_000_000
 
-from synth_setup_pts import (
-    SAMPLE_RATE,
-    check_touch,
-    keys,
-    knobA,
-    knobB,
-    mixer,
-    setup_display,
-    setup_touch,
-)
-from synth_setup_pts import synth as engine
+from pico_test_synth import Hardware
 from synthtools import BasslineSynth, Patch
 
 # Only the 14 names in synthtools/__init__.py's _LAZY map can be imported
@@ -150,25 +143,29 @@ patch = Patch(
 )
 # fmt: on
 
-# A Biquad above Nyquist is undefined, and synth_setup_pts runs at
+# A Biquad above Nyquist is undefined, and Hardware runs at
 # 22.05 kHz, so 9.9 kHz is the ceiling -- not the class default of 20 kHz.
 # filt_f alone reaches 5000 and a full accent adds 4000 on top. Set on the
 # SUBCLASS, and BEFORE construction: the clamp is baked into the block
 # graph at build time.
-BasslineSynth.FILT_F_MAX = SAMPLE_RATE * 0.45
+hw = Hardware()
+BasslineSynth.FILT_F_MAX = hw.sample_rate * 0.45
 
-bass = BasslineSynth(engine, patch)
+bass = BasslineSynth(hw.synth, patch)
 
 # play() captures object identity at call time, so this has to happen after
 # the fx chain exists -- and again after any STRUCTURAL fx change
 # (fx_filter_stages, fx_distortion_on, fx_echo_on). None of the knobs below
 # is structural, so once is enough here.
+# Hardware.__init__ already played the bare synthesizer into voice 0;
+# this REPLACES that with the effects chain's tail. Without it the whole
+# chain is bypassed and nothing sounds wrong -- it just sounds thin.
 try:
-    mixer.voice[0].play(bass.output)
+    hw.mixer.voice[0].play(bass.output)
     print("filter: 24 dB/octave (1 extra stage)")
 except ImportError:
     print("no audiofilters in this build -- 12 dB/oct, no drive, no delay")
-    mixer.voice[0].play(bass.synthio)
+    hw.mixer.voice[0].play(bass.synthio)
 
 # --- the 18 parameters, in knob-pair order -------------------------------
 # Two pots, so params[0:2] are page 1, params[2:4] page 2, and so on.
@@ -182,7 +179,10 @@ PARAMS = [
     Param("cutoff",   patch.filt_f,        100,  5000,  "%4d",   "filt_f"),
     Param("envmod",   patch.envmod,        0.0,  1.0,   "%.2f",  "envmod"),
 
-    Param("resQ",     patch.filt_q,        0.5,  4.0,   "%.2f",  "filt_q"),
+    # 4.0, not 6.0: an accent adds accent_q (up to 2.0) onto this same
+    # shared block, so 4+2 is what actually reaches the filter. 0.6-6 is
+    # the useful span -- see Synth.filt_q.
+    Param("resQ",     patch.filt_q,        0.6,  4.0,   "%.2f",  "filt_q"),
     Param("decay",    patch.decay,         0.02, 0.40,  "%.2f",  "decay"),
 
     # the amp's decay, which wants to stay longer than the filter's
@@ -216,15 +216,26 @@ PARAMS = [
 # so say so here rather than wondering where "bpm" went.
 assert len(PARAMS) % 2 == 0, "PARAMS must be even: two knobs per page"
 
-param_set = ParamSet(PARAMS, num_knobs=2)
+# KNOB_SCALE, not the default KNOB_PICKUP: a turn always moves the
+# value, scaled so knob and value converge and reach the ends
+# together, instead of the pot being dead until it crosses.
+param_set = ParamSet(PARAMS, num_knobs=2, knob_mode=ParamSet.KNOB_SCALE)
 
 
 def apply_param(p):
-    """Push one param onto the synth. Not everything is a plain setattr."""
+    """Push one param onto the synth. Not everything is a plain setattr.
+
+    A discrete parameter selects with round(), not int(). ParamSet
+    deadbands: it stops updating once the knob is within
+    0.1 * min_change * span of the value, so a pot at full scale leaves
+    p.val a hair under vmax. int() truncates that to vmax - 1 and the last
+    choice becomes unreachable; round() also gives every choice an equal
+    band instead of a zero-width one at the top.
+    """
     if p.name == "wave":
-        bass.wave = WAVES[int(p.val)]  # index -> name string
+        bass.wave = WAVES[round(p.val)]  # index -> name string
     elif p.name == "seq":
-        set_seq(int(p.val))
+        set_seq(round(p.val))
     elif p.name == "bpm":
         sequencer.bpm = p.val
     else:
@@ -233,7 +244,15 @@ def apply_param(p):
 
 def param_text(p):
     """Format one param for the screen. Wave shows its name, not its index."""
-    return WAVES[int(p.val)] if p.name == "wave" else p.fmt % p.val
+    # A discrete param must be FORMATTED the same way apply_param
+    # SELECTS it. "%d" truncates, so a value of 2.99 would print 2
+    # while round() applied 3 -- the screen disagreeing with the
+    # sound, which reads as a synth bug rather than a display one.
+    if p.name == "wave":
+        return WAVES[round(p.val)]
+    if p.name == "seq":
+        return "%d" % round(p.val)
+    return p.fmt % p.val
 
 
 # --- the sequencer -------------------------------------------------------
@@ -281,8 +300,8 @@ print("tbish2: tap button for page, hold to play/pause, pads transpose")
 
 # --- hardware ------------------------------------------------------------
 # setup_display() takes over the screen from the console, so print first.
-display = setup_display()
-setup_touch("up")
+display = hw.setup_display()
+hw.setup_touch("up")
 ui = TBishUI(display, param_set, param_text)
 display.root_group = ui
 
@@ -324,7 +343,7 @@ def load_params():
 def check_button():
     """Tap = next page, hold = play/pause. Decided on release, no timer."""
     global press_t
-    ev = keys.events.get()
+    ev = hw.keys.events.get()
     if not ev:
         return
     if ev.pressed:
@@ -341,7 +360,7 @@ def check_button():
 
 def play_pads():
     """Pads transpose the sequence. Returns True if any pad changed."""
-    events = check_touch()
+    events = hw.check_touch()
     for ev in events:
         if ev.pressed:
             # centred on the middle of the strip, so the pads go DOWN as
@@ -353,11 +372,11 @@ def play_pads():
 
 def update_ui():
     """Read the pots, push only what moved, redraw only what changed."""
-    knobs = (knobA.value / 65535, knobB.value / 65535)
+    knobs = hw.read_pots()  # filtered, 0.0-1.0
     i = param_set.idx * param_set.nknobs
     page = PARAMS[i : i + param_set.nknobs]
     before = [p.val for p in page]
-    param_set.update_knobs(knobs)  # PICKUP mode + min_change deadband
+    param_set.update_knobs(knobs)  # scaled takeover, always moves
     for p, was in zip(page, before):
         if p.val != was:  # only a real move gets applied
             apply_param(p)

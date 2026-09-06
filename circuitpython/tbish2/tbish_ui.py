@@ -4,7 +4,7 @@
 # tbish_ui.py -- two-knob parameter display plus a step dot, 128x64 OLED
 #
 # Descended from tbish/tbish_ui.py, with the display economy the rest of
-# this repo learned since (see lib/synth_ui_pts.py for the measurements):
+# this repo learned since (see pico_test_synth/ui.py for the measurements):
 #
 #   * update() does NOT call display.refresh(). The caller picks the
 #     moment, so the ~9.6 ms I2C burst never lands in the same pass that
@@ -15,9 +15,9 @@
 #     2.9 ms on every idle pass, against 0.24 ms for the float compare.
 #   * `dirty` is sticky: set here, cleared by whoever refreshes.
 #
-# The step dot is why this is not just lib/synth_ui_pts.py: a sequencer
-# wants a beat readout, and SynthUI's 16-column footer has no room for
-# one next to the page and pickup marks.
+# The step dot is why this is not just pico_test_synth.ui: a sequencer
+# wants a beat readout across the bottom of the screen, which SynthUI's
+# single-line footer has no room for.
 
 import displayio
 import terminalio

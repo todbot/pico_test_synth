@@ -28,7 +28,7 @@ Four of tbish's eight files are gone into the library:
 | `tbish_sequencer.py` | `synthtools.step_sequencer.StepSequencer` |
 | `paramset.py` | `synthtools.paramset` |
 | `pitch_glider.py` | dropped — slide is `Synth.mono` + `glide_time` |
-| `synth_setup_pts.py` | `../lib/synth_setup_pts.py`, shared |
+| `synth_setup_pts.py` | `pico_test_synth.Hardware`, shared |
 
 `tbish/` is left exactly as it was.
 
@@ -44,8 +44,15 @@ never jumps when you turn one.
 
 ## Install
 
-Copy `code.py`, `tbish_ui.py` and `boot.py` to the CIRCUITPY root, plus
-this repo's `circuitpython/lib/` (for the shared `synth_setup_pts.py`).
+Copy `code.py`, `tbish_ui.py` and `boot.py` to the CIRCUITPY root, then
+install the libraries from `circuitpython/`:
+
+```
+circup install -r requirements.txt
+```
+
+That covers the local `lib/pico_test_synth` board package too — circup
+installs from a path as readily as from the bundle.
 
 `boot.py` is what makes the filesystem writable from the board's side.
 Without it, saving the knobs on pause fails and the demo prints a note

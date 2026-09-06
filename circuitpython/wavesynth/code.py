@@ -31,12 +31,13 @@
 # waveB, nested amp_env objects) and is left on disk untouched rather than
 # converted, since the wave fields have no meaning here any more.
 #
-# Libraries needed:
-#   circup install synthtools tmidi adafruit_wave \
-#                  adafruit_display_text adafruit_displayio_ssd1306
+# Copy the contents of this folder (including wavetables/) to the
+# CIRCUITPY root, then, from circuitpython/:
 #
-# Copy lib/ to CIRCUITPY/lib, and the contents of this folder (including
-# wavetables/) to the CIRCUITPY root.
+#   circup install -r requirements.txt
+#
+# That pulls synthtools, tmidi, adafruit_wave and the local
+# lib/pico_test_synth that Hardware comes from.
 
 import asyncio
 import os
@@ -61,8 +62,13 @@ WAVE_DIR = "/wavetables"
 touch_midi_notes = list(range(45, 45 + 16))
 
 print("hardware...")
-hw = Hardware()  # for pico_test_synth2; pass Pull.DOWN for pico_test_synth1
-splash_screen(hw.display)
+# volume=1.0 keeps this booting as loud as it always has -- Hardware
+# now defaults to 0.25, which is kinder to headphones but would show up
+# as the Volume gauge reading 0.25 at startup.
+hw = Hardware(volume=1.0)
+splash_screen(hw.setup_display())
+hw.setup_touch("up")        # "down" for a pico_test_synth1 with a Pico 1
+hw.setup_midi_uart()
 time.sleep(1)  # let USB quiet down (when debugging)
 
 midi_usb = tmidi.MIDI(midi_in=usb_midi.ports[0])
@@ -123,7 +129,7 @@ patch = patches[0]
 # A synthio.Biquad above Nyquist is undefined, and Hardware runs the mixer
 # at 25600 Hz. Set on the SUBCLASS and BEFORE constructing -- the clamp is
 # baked into the shared block graph at build time.
-WavetableSynth.FILT_F_MAX = hw.mixer.sample_rate * 0.45
+WavetableSynth.FILT_F_MAX = hw.sample_rate * 0.45
 
 synth = WavetableSynth(hw.synth, patch)
 octave = 0  # app state, not a synth parameter
@@ -152,7 +158,7 @@ params = (
     ParamRange("FiltFreq", "filter frequency", synth.filt_f, "%4d", 60, 8000,
                setter=lambda x: setattr(synth, "filt_f", x),
                getter=lambda: synth.filt_f),
-    ParamRange("FilterRes", "filter resonance", synth.filt_q, "%1.2f", 0.1, 8.0,
+    ParamRange("FilterRes", "filter resonance", synth.filt_q, "%1.2f", 0.6, 6.0,
                setter=lambda x: setattr(synth, "filt_q", x),
                getter=lambda: synth.filt_q),
 
@@ -244,7 +250,8 @@ def load_patches_action(patchidx):
 
 
 update_params()
-knobA, knobB = hw.read_pots()
+# read_pots() is 0.0-1.0; GaugeCluster and ParamScaler work in 0-255
+knobA, knobB = (v * 255 for v in hw.read_pots())
 synthui = SynthUI(hw.display, params, knobA, knobB)
 synthui.set_patch_name(patch.name)
 
@@ -279,8 +286,8 @@ async def ui_handler():
         hw.display.refresh()
 
         knobA, knobB = hw.read_pots()
-        synthui.setA(knobA)
-        synthui.setB(knobB)
+        synthui.setA(knobA * 255)
+        synthui.setB(knobB * 255)
 
         if button := hw.check_button():
             if button.pressed:

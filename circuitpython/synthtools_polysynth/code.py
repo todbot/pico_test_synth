@@ -3,13 +3,13 @@
 #
 # synthtools_polysynth -- a playable SubtractiveSynth with a screen
 #
-# For a pico_test_synth2. Copy this code.py onto CIRCUITPY, plus the
-# repo's circuitpython/lib/ (which carries the shared synth_setup_pts.py
-# and synth_ui_pts.py this imports), plus the synthtools package.
+# For a pico_test_synth2. Copy this code.py onto the CIRCUITPY root; the
+# libraries it needs come from the repo's requirements.txt:
 #
-# Those two modules used to live in this folder; they are now shared with
-# tbish2/ and the other synthtools demos. CircuitPython puts lib/ on
-# sys.path, so the import lines below are unchanged.
+#   circup install -r requirements.txt     (run from circuitpython/)
+#
+# The board itself is the pico_test_synth Hardware class, and the screen
+# is its optional general two-pot UI.
 #
 # 16 touch pads are a chromatic keyboard, two pots edit 14 synth
 # parameters two at a time, and a 128x64 OLED shows which two.
@@ -17,15 +17,12 @@
 #   tap the button   -> next pair of parameters (7 pages)
 #   hold the button  -> next octave (C2 / C3 / C4)
 #
-# The pots use ParamSet's PICKUP mode: after changing page a pot does
-# nothing until it passes the value the parameter already has, so the
-# sound never jumps when you turn one. The footer shows "A*" once a pot
-# has picked up, "A-" while it is still waiting.
+# The pots use scaled ("catch-up") takeover: a turn ALWAYS moves the
+# value, by an amount scaled so knob and value converge and reach the
+# ends together. No dead travel after a page turn -- see
+# ParamSet.update_knobs_scale() in synthtools.
 #
-# Libraries needed:
-#   circup install synthtools adafruit_display_text \
-#                  adafruit_displayio_ssd1306 adafruit_debouncer
-#
+
 # Polyphony: the patch has detune=1.0, so one synthio Note per pad. All
 # sixteen pads down plus a few releasing still fits synthio's 24-note
 # budget. Turning the detune knob (page 7) up spends TWO Notes per pad,
@@ -46,6 +43,9 @@
 #      attack/decay/sustain/release each rebuild a synthio.Envelope and
 #      push it to every sounding note. That is an allocation 20x a second
 #      for a pot nobody is touching. See update_ui() below.
+#   (That scan was 8.2 ms until Hardware.check_touch() dropped
+#   adafruit_debouncer -- see its docstring for the measurements.)
+#
 #   2. SynthUI.update() compares the raw float BEFORE formatting anything,
 #      so an idle pass does no string work at all.
 #   3. The whole UI pass is throttled to UI_INTERVAL.
@@ -61,10 +61,10 @@
 #   one value+bar changes, update only      6.8 ms   (glyph re-render)
 #   ...and its refresh()                    9.6 ms   (I2C, chunked)
 #   a page change, all six elements         41 + 34 ms
-#   check_touch(), all 16 pads              8.2 ms
+#   check_touch(), all 16 pads              5.1 ms
 #
-# So the loop is dominated by the touch scan and runs near 80-100 Hz, an
-# idle screen costs about 1% of it, and a page turn is a ~75 ms hiccup you
+# So the loop is dominated by the touch scan and runs near 150-200 Hz, an
+# idle screen costs about 2% of it, and a page turn is a ~75 ms hiccup you
 # can feel in touch latency. That last one is the honest weak spot: it is
 # 8 label re-renders in one iteration. Audio survives it because displayio
 # runs background tasks between I2C chunks and the VM yields between
@@ -76,7 +76,7 @@
 # chasing it. Measured with hands off the controls: the pots wrote a
 # parameter 0 times in 100 passes, no single touch read exceeded 0.38 ms,
 # and nothing in this loop has a 1 Hz period at all. It was render
-# headroom, and the fix is the sample rate in synth_setup_pts.py.
+# headroom, and the fix is the sample rate Hardware defaults to.
 
 import time
 
@@ -89,18 +89,8 @@ import microcontroller
 # which is why 1.6x the clock is nowhere near 1.6x the speed.)
 microcontroller.cpu.frequency = 200_000_000
 
-from synth_setup_pts import (
-    SAMPLE_RATE,
-    check_touch,
-    keys,
-    knobA,
-    knobB,
-    setup_display,
-    setup_touch,
-)
-from synth_setup_pts import synth as engine
-from synth_ui_pts import SynthUI
-
+from pico_test_synth import Hardware
+from pico_test_synth.ui import SynthUI
 from synthtools import Patch, SubtractiveSynth
 from synthtools.paramset import Param, ParamSet
 
@@ -132,15 +122,16 @@ patch = Patch(name="touch lead", wave="ASAW", detune=1.0,
               filt_track=0.0)
 # fmt: on
 
-# A Biquad above Nyquist is undefined, and synth_setup_pts runs at 22.05 kHz
+# A Biquad above Nyquist is undefined, and Hardware runs at 22.05 kHz
 # to stop this rig glitching -- so 11 kHz, not the class default of 20 kHz,
 # is the ceiling. The cutoff bus can genuinely reach it: 4000 Hz of filt_f
 # plus 6000 of envelope plus keyboard tracking sums well past 11 kHz on the
 # top pads. Set on the SUBCLASS, so the library's Synth is left alone, and
 # BEFORE construction -- the shared clamp bakes this in at graph-build time.
-SubtractiveSynth.FILT_F_MAX = SAMPLE_RATE * 0.45
+hw = Hardware()
+SubtractiveSynth.FILT_F_MAX = hw.sample_rate * 0.45
 
-synth = SubtractiveSynth(engine, patch)
+synth = SubtractiveSynth(hw.synth, patch)
 
 # --- the 14 parameters, in knob-pair order -------------------------------
 # Two pots, so params[0:2] are page 1, params[2:4] page 2, and so on.
@@ -148,7 +139,7 @@ synth = SubtractiveSynth(engine, patch)
 # that is what ParamSet is for.
 #
 # Every one is seeded from the patch, so the screen matches what is
-# actually sounding at boot and pickup starts from the right place.
+# actually sounding at boot.
 # fmt: off
 PARAMS = [
     # 60-4000 rather than the filter's full range: this is a LINEAR pot, so
@@ -156,7 +147,9 @@ PARAMS = [
     # few percent of travel. 4000 puts 500 Hz at ~11% and the envelope
     # (up to +6000 Hz) still reaches the top of the audible range.
     Param("cutoff",   patch.filt_f,       60,    4000,  "%.0f",  "filt_f"),
-    Param("reso",     patch.filt_q,       0.5,   14.0,  "%.1f",  "filt_q"),
+    # 0.6-6 is the whole useful span: below 0.6 the filter is overdamped
+    # and the knob does nothing, past 6 it squeals. See Synth.filt_q.
+    Param("reso",     patch.filt_q,       0.6,    6.0,  "%.1f",  "filt_q"),
 
     Param("attack",   patch.amp_env[0],   0.0,   2.0,   "%.2f",  "attack_time"),
     Param("release",  patch.amp_env[3],   0.01,  3.0,   "%.2f",  "release_time"),
@@ -185,13 +178,24 @@ PARAMS = [
 ]
 # fmt: on
 
-param_set = ParamSet(PARAMS, num_knobs=2)
+# KNOB_SCALE, not the default KNOB_PICKUP: a turn always moves the
+# value, scaled so knob and value converge and reach the ends
+# together, instead of the pot being dead until it crosses.
+param_set = ParamSet(PARAMS, num_knobs=2, knob_mode=ParamSet.KNOB_SCALE)
 
 
 def apply_param(p):
-    """Push one param onto the synth. Two knobs need more than a setattr."""
+    """Push one param onto the synth. Two knobs need more than a setattr.
+
+    A discrete parameter selects with round(), not int(). ParamSet
+    deadbands: it stops updating once the knob is within
+    0.1 * min_change * span of the value, so a pot at full scale leaves
+    p.val a hair under vmax. int() truncates that to vmax - 1 and the last
+    choice becomes unreachable; round() also gives every choice an equal
+    band instead of a zero-width one at the top.
+    """
     if p.name == "wave":
-        synth.wave = WAVES[int(p.val)]  # index -> name string
+        synth.wave = WAVES[round(p.val)]  # index -> name string
     elif p.name == "detune" and p.val < DETUNE_OFF:
         synth.detune = 1.0  # exactly 1.0 is what _make_notes tests for
     else:
@@ -200,7 +204,7 @@ def apply_param(p):
 
 def param_text(p):
     """Format one param for the screen. Wave shows its name, not its index."""
-    return WAVES[int(p.val)] if p.name == "wave" else p.fmt % p.val
+    return WAVES[round(p.val)] if p.name == "wave" else p.fmt % p.val
 
 
 # Catch a bad objattr or an over-wide name at boot rather than at the page
@@ -216,8 +220,8 @@ print("synthtools touch demo: 16 pads, tap button for page, hold for octave")
 
 # --- hardware ------------------------------------------------------------
 # setup_display() takes over the screen from the console, so print first.
-display = setup_display()
-setup_touch(TOUCH_PULL)
+display = hw.setup_display()
+hw.setup_touch(TOUCH_PULL)
 ui = SynthUI(display, param_set, param_text)
 
 held = {}  # pad number -> the midi note actually pressed on it
@@ -233,7 +237,7 @@ def oct_name():
 
 def play_pads():
     """Handle touch events. Returns True if any pad changed state."""
-    events = check_touch()
+    events = hw.check_touch()
     for ev in events:
         if ev.pressed:
             # remember the note we actually played, so changing octave
@@ -253,7 +257,7 @@ def play_pads():
 def check_button():
     """Tap = next page, hold = next octave. Decided on release, so no timer."""
     global press_t, oct_i, base_note
-    ev = keys.events.get()
+    ev = hw.keys.events.get()
     if not ev:
         return
     if ev.pressed:
@@ -267,11 +271,11 @@ def check_button():
 
 def update_ui():
     """Read the pots, push only what moved, redraw only what changed."""
-    knobs = (knobA.value / 65535, knobB.value / 65535)
+    knobs = hw.read_pots()  # filtered, 0.0-1.0
     i = param_set.idx * param_set.nknobs
     page = PARAMS[i : i + param_set.nknobs]
     before = [p.val for p in page]
-    param_set.update_knobs(knobs)  # PICKUP mode + min_change deadband
+    param_set.update_knobs(knobs)  # scaled takeover, always moves
     for p, was in zip(page, before):
         if p.val != was:  # only a real move gets applied
             apply_param(p)

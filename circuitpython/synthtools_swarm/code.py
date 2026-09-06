@@ -3,13 +3,13 @@
 #
 # synthtools_swarm -- a supersaw drone, on synthtools' SwarmSynth
 #
-# For a pico_test_synth / pico_test_synth2. Copy this code.py onto
-# CIRCUITPY, plus the repo's circuitpython/lib/ (for synth_setup_pts.py
-# and synth_ui_pts.py) and the synthtools package.
+# For a pico_test_synth / pico_test_synth2. Copy this code.py onto the
+# CIRCUITPY root, then, from circuitpython/:
 #
-# Libraries needed:
-#   circup install synthtools adafruit_display_text \
-#                  adafruit_displayio_ssd1306 adafruit_debouncer
+#   circup install -r requirements.txt
+#
+# That pulls the synthtools package and the local lib/pico_test_synth
+# board package, whose optional ui module draws the screen here.
 #
 # SwarmSynth stacks up to 8 detuned oscillators on ONE note. It is
 # mono = True, so the 16 pads behave like a pitch ribbon: touching a new
@@ -32,18 +32,8 @@ import microcontroller
 
 microcontroller.cpu.frequency = 200_000_000
 
-from synth_setup_pts import (
-    SAMPLE_RATE,
-    check_touch,
-    keys,
-    knobA,
-    knobB,
-    mixer,
-    setup_display,
-    setup_touch,
-)
-from synth_setup_pts import synth as engine
-from synth_ui_pts import SynthUI
+from pico_test_synth import Hardware
+from pico_test_synth.ui import SynthUI
 from synthtools import Patch, SwarmSynth
 from synthtools.paramset import Param, ParamSet
 
@@ -62,16 +52,17 @@ patch = Patch(name="swarm", synth_type="swarm", wave="SAW",
               vib_rate=0.0, vib_depth=0.0)
 # fmt: on
 
-SwarmSynth.FILT_F_MAX = SAMPLE_RATE * 0.45  # SUBCLASS, before constructing
+hw = Hardware()
+SwarmSynth.FILT_F_MAX = hw.sample_rate * 0.45  # SUBCLASS, before constructing
 
-synth = SwarmSynth(engine, patch)
+synth = SwarmSynth(hw.synth, patch)
 synth.glide_time = 0.25  # the ribbon glissando; mono makes this audible
 
 # SwarmSynth divides each note's amplitude by swarm_count so the stack does
 # not clip, which leaves the whole instrument quiet. Make it back up here
 # rather than in the patch -- the mixer is the one gain that does not have
 # to be shared with anything.
-mixer.voice[0].level = 0.9
+hw.set_volume(0.9)
 
 # --- the 8 parameters, in knob-pair order --------------------------------
 # fmt: off
@@ -87,7 +78,7 @@ PARAMS = [
     Param("glide",    synth.glide_time,    0.0,  1.5,   "%.2f",  "glide_time"),
 
     Param("cutoff",   patch.filt_f,        60,   4000,  "%4d",   "filt_f"),
-    Param("reso",     patch.filt_q,        0.5,  8.0,   "%.1f",  "filt_q"),
+    Param("reso",     patch.filt_q,        0.6,  6.0,   "%.1f",  "filt_q"),
 
     # wave has no objattr: it is an INDEX, not the string synth.wave wants
     Param("wave",     WAVES.index(patch.wave), 0, len(WAVES) - 1, "%.0f", None),
@@ -96,20 +87,37 @@ PARAMS = [
 # fmt: on
 assert len(PARAMS) % 2 == 0, "PARAMS must be even: two knobs per page"
 
-param_set = ParamSet(PARAMS, num_knobs=2)
+# KNOB_SCALE, not the default KNOB_PICKUP: a turn always moves the
+# value, scaled so knob and value converge and reach the ends
+# together, instead of the pot being dead until it crosses.
+param_set = ParamSet(PARAMS, num_knobs=2, knob_mode=ParamSet.KNOB_SCALE)
 
 
 def apply_param(p):
+    # A discrete parameter selects with round(), not int(). ParamSet
+    # deadbands: it stops updating once the knob is within
+    # 0.1 * min_change * span of the value, so a pot at full scale leaves
+    # p.val a hair under vmax. int() truncates that to vmax - 1 and the last
+    # choice becomes unreachable; round() also gives every choice an equal
+    # band instead of a zero-width one at the top.
     if p.name == "wave":
-        synth.wave = WAVES[int(p.val)]  # index -> name string
+        synth.wave = WAVES[round(p.val)]  # index -> name string
     elif p.name == "count":
-        synth.swarm_count = int(p.val)  # the setter clamps to 1..MAX_OSCS
+        synth.swarm_count = round(p.val)  # the setter clamps to 1..MAX_OSCS
     else:
         p.apply_to_obj(synth)
 
 
 def param_text(p):
-    return WAVES[int(p.val)] if p.name == "wave" else p.fmt % p.val
+    # A discrete param must be FORMATTED the same way apply_param
+    # SELECTS it. "%d" truncates, so a value of 2.99 would print 2
+    # while round() applied 3 -- the screen disagreeing with the
+    # sound, which reads as a synth bug rather than a display one.
+    if p.name == "wave":
+        return WAVES[round(p.val)]
+    if p.name == "count":
+        return "%d" % round(p.val)
+    return p.fmt % p.val
 
 
 for _p in PARAMS:
@@ -121,8 +129,8 @@ for _p in PARAMS:
 
 print("synthtools swarm: %d oscs, mono=%s" % (synth.swarm_count, synth.mono))
 
-display = setup_display()
-setup_touch("up")
+display = hw.setup_display()
+hw.setup_touch("up")
 ui = SynthUI(display, param_set, param_text)
 
 held = {}  # pad -> the note it played
@@ -138,7 +146,7 @@ def oct_name():
 
 def play_pads():
     """Mono ribbon: a new pad steals the voice, the last release ends it."""
-    events = check_touch()
+    events = hw.check_touch()
     for ev in events:
         if ev.pressed:
             note = base_note + ev.key_number
@@ -156,7 +164,7 @@ def play_pads():
 
 def check_button():
     global press_t, oct_i, base_note
-    ev = keys.events.get()
+    ev = hw.keys.events.get()
     if not ev:
         return
     if ev.pressed:
@@ -169,7 +177,7 @@ def check_button():
 
 
 def update_ui():
-    knobs = (knobA.value / 65535, knobB.value / 65535)
+    knobs = hw.read_pots()  # filtered, 0.0-1.0
     i = param_set.idx * param_set.nknobs
     page = PARAMS[i : i + param_set.nknobs]
     before = [p.val for p in page]

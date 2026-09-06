@@ -3,13 +3,13 @@
 #
 # synthtools_arp -- hold pads, the arpeggiator plays them back
 #
-# For a pico_test_synth / pico_test_synth2. Copy this code.py onto
-# CIRCUITPY, plus the repo's circuitpython/lib/ (for synth_setup_pts.py
-# and synth_ui_pts.py) and the synthtools package.
+# For a pico_test_synth / pico_test_synth2. Copy this code.py onto the
+# CIRCUITPY root, then, from circuitpython/:
 #
-# Libraries needed:
-#   circup install synthtools adafruit_display_text \
-#                  adafruit_displayio_ssd1306 adafruit_debouncer
+#   circup install -r requirements.txt
+#
+# That pulls the synthtools package and the local lib/pico_test_synth
+# board package, whose optional ui module draws the screen here.
 #
 # Each pad you hold is a ROOT note. The "chord" parameter picks a set of
 # intervals from synthtools.arpeggiator.patterns, and every held root
@@ -20,8 +20,10 @@
 #   hold the button  -> next octave
 #   hold a pad       -> add its root to the arpeggio
 #
-# The pots use ParamSet's PICKUP mode: after changing page a pot does
-# nothing until it passes the value the parameter already has.
+# The pots use scaled ("catch-up") takeover: a turn ALWAYS moves the
+# value, by an amount scaled so knob and value converge and reach the
+# ends together. No dead travel after a page turn -- see
+# ParamSet.update_knobs_scale() in synthtools.
 
 import time
 
@@ -31,17 +33,8 @@ import microcontroller
 # thing in the loop (10.9 ms at 125 MHz, 8.2 at 200).
 microcontroller.cpu.frequency = 200_000_000
 
-from synth_setup_pts import (
-    SAMPLE_RATE,
-    check_touch,
-    keys,
-    knobA,
-    knobB,
-    setup_display,
-    setup_touch,
-)
-from synth_setup_pts import synth as engine
-from synth_ui_pts import SynthUI
+from pico_test_synth import Hardware
+from pico_test_synth.ui import SynthUI
 from synthtools import Patch, SubtractiveSynth
 
 # Only the 14 names in synthtools/__init__.py's _LAZY map come from the
@@ -65,11 +58,12 @@ patch = Patch(name="arp", wave="SAW", detune=1.0,
               fenv_curve=2)
 # fmt: on
 
-# A Biquad above Nyquist is undefined and synth_setup_pts runs at
-# 22.05 kHz. Set on the SUBCLASS, BEFORE construction.
-SubtractiveSynth.FILT_F_MAX = SAMPLE_RATE * 0.45
+# A Biquad above Nyquist is undefined and Hardware runs at 22.05 kHz.
+# Set on the SUBCLASS, BEFORE construction.
+hw = Hardware()
+SubtractiveSynth.FILT_F_MAX = hw.sample_rate * 0.45
 
-synth = SubtractiveSynth(engine, patch)
+synth = SubtractiveSynth(hw.synth, patch)
 
 # --- the 10 parameters, in knob-pair order -------------------------------
 # fmt: off
@@ -81,7 +75,7 @@ PARAMS = [
     Param("octrange", 1,                   1,    3,     "%1d",   None),
 
     Param("cutoff",   patch.filt_f,        60,   4000,  "%4d",   "filt_f"),
-    Param("reso",     patch.filt_q,        0.5,  8.0,   "%.1f",  "filt_q"),
+    Param("reso",     patch.filt_q,        0.6,  6.0,   "%.1f",  "filt_q"),
 
     Param("envamt",   patch.fenv_amount,   0,    6000,  "%4d",   "fenv_amount"),
     Param("envrel",   patch.fenv_release,  0.01, 1.0,   "%.2f",  "fenv_release"),
@@ -93,7 +87,10 @@ PARAMS = [
 # fmt: on
 assert len(PARAMS) % 2 == 0, "PARAMS must be even: two knobs per page"
 
-param_set = ParamSet(PARAMS, num_knobs=2)
+# KNOB_SCALE, not the default KNOB_PICKUP: a turn always moves the
+# value, scaled so knob and value converge and reach the ends
+# together, instead of the pot being dead until it crosses.
+param_set = ParamSet(PARAMS, num_knobs=2, knob_mode=ParamSet.KNOB_SCALE)
 
 held = {}  # pad number -> the root note it added
 oct_i = 1
@@ -119,22 +116,30 @@ def rebuild_arp():
     chord knob with pads down re-voices what is already playing.
     """
     arp.notes = []
-    shape = patterns[int(param_set.param_for_name("chord").val)]
+    shape = patterns[round(param_set.param_for_name("chord").val)]
     for root in held.values():
         for interval in shape:
             arp.add_note(root + interval)
 
 
 def apply_param(p):
-    """Push one param. Only some of these are synth attributes."""
+    """Push one param. Only some of these are synth attributes.
+
+    A discrete parameter selects with round(), not int(). ParamSet
+    deadbands: it stops updating once the knob is within
+    0.1 * min_change * span of the value, so a pot at full scale leaves
+    p.val a hair under vmax. int() truncates that to vmax - 1 and the last
+    choice becomes unreachable; round() also gives every choice an equal
+    band instead of a zero-width one at the top.
+    """
     if p.name == "wave":
-        synth.wave = WAVES[int(p.val)]  # index -> name string
+        synth.wave = WAVES[round(p.val)]  # index -> name string
     elif p.name == "bpm":
         arp.set_bpm(p.val, RATE)
     elif p.name == "gate":
         arp.gate = p.val
     elif p.name == "octrange":
-        arp.oct_range = int(p.val)
+        arp.oct_range = round(p.val)
     elif p.name == "chord":
         rebuild_arp()
     else:
@@ -143,10 +148,16 @@ def apply_param(p):
 
 def param_text(p):
     """Format one param. Two of these are names, not numbers."""
+    # A discrete param must be FORMATTED the same way apply_param
+    # SELECTS it. "%d" truncates, so a value of 2.99 would print 2
+    # while round() applied 3 -- the screen disagreeing with the
+    # sound, which reads as a synth bug rather than a display one.
     if p.name == "wave":
-        return WAVES[int(p.val)]
+        return WAVES[round(p.val)]
     if p.name == "chord":
-        return pattern_names[int(p.val)][:5]
+        return pattern_names[round(p.val)][:5]
+    if p.name == "octrange":
+        return "%d" % round(p.val)
     return p.fmt % p.val
 
 
@@ -162,8 +173,8 @@ for _p in PARAMS:
 print("synthtools arp: hold pads, tap button for page, hold for octave")
 
 # setup_display() takes over the screen from the console, so print first.
-display = setup_display()
-setup_touch("up")
+display = hw.setup_display()
+hw.setup_touch("up")
 ui = SynthUI(display, param_set, param_text)
 
 press_t = 0.0
@@ -177,7 +188,7 @@ def oct_name():
 
 def play_pads():
     """Held pads are arpeggio roots. Returns True if any pad changed."""
-    events = check_touch()
+    events = hw.check_touch()
     for ev in events:
         if ev.pressed:
             held[ev.key_number] = base_note + ev.key_number
@@ -191,7 +202,7 @@ def play_pads():
 def check_button():
     """Tap = next page, hold = next octave. Decided on release."""
     global press_t, oct_i, base_note
-    ev = keys.events.get()
+    ev = hw.keys.events.get()
     if not ev:
         return
     if ev.pressed:
@@ -207,11 +218,11 @@ def check_button():
 
 def update_ui():
     """Read the pots, push only what moved, redraw only what changed."""
-    knobs = (knobA.value / 65535, knobB.value / 65535)
+    knobs = hw.read_pots()  # filtered, 0.0-1.0
     i = param_set.idx * param_set.nknobs
     page = PARAMS[i : i + param_set.nknobs]
     before = [p.val for p in page]
-    param_set.update_knobs(knobs)
+    param_set.update_knobs(knobs)  # scaled takeover, always moves
     for p, was in zip(page, before):
         if p.val != was:
             apply_param(p)
