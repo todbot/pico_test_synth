@@ -46,7 +46,7 @@ WAVE_DIR = "/wavetables"
 touch_midi_notes = list(range(45, 45 + 16))
 
 print("hardware...")
-# not Hardware's headphone-friendly 0.25 default -- the Volume gauge
+# not Hardware's headphone-friendly 0.25 default; the Volume gauge
 # would then read 0.25 at boot
 hw = Hardware(volume=1.0)
 splash_screen(hw.setup_display())
@@ -131,8 +131,8 @@ def wave_idx():
 
 # --- the 14 parameters, in gauge order -----------------------------------
 # IMPORTANT: these setters and getters talk to the SYNTH, not the patch.
-# synthtools keeps a Patch inert -- a property setter never writes back to
-# it -- so reading the patch here would show stale values.
+# synthtools keeps a Patch inert (a property setter never writes back to
+# it) so reading the patch here would show stale values.
 params = (
     # Pair 0
     ParamRange("FiltFreq", "filter frequency", synth.filt_f, "%4d", 60, 8000,
@@ -175,7 +175,7 @@ params = (
                 setter=lambda x: setattr(synth, "filt_type", FILTER_TYPES[int(x)]),
                 getter=lambda: FILTER_TYPES.index(synth.filt_type)),
 
-    # Pair 5 -- the filter LFO
+    # Pair 5, the filter LFO
     ParamRange("FiltLFO", "filter lfo amount", synth.filt_lfo_amount, "%4d", 0, 4000,
                setter=lambda x: setattr(synth, "filt_lfo_amount", x),
                getter=lambda: synth.filt_lfo_amount),
@@ -183,7 +183,7 @@ params = (
                setter=lambda x: setattr(synth, "filt_lfo_rate", x),
                getter=lambda: synth.filt_lfo_rate),
 
-    # Pair 6 -- neither of these is a synth parameter
+    # Pair 6, neither of these is a synth parameter
     ParamRange("Octave", "octave range", 0, "%d", -3, 2,
                setter=set_octave,
                getter=lambda: octave),
@@ -205,7 +205,7 @@ def save_patches_action():
     time.sleep(0.2)
     synthui.set_patch_name("Saving...")
     hw.display.refresh()
-    # the knobs wrote the SYNTH, not the patch -- without this the file
+    # the knobs wrote the SYNTH, not the patch, without this the file
     # gets the values the patch was loaded with
     synth.save_patch()
     try:

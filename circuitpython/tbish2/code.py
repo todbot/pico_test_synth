@@ -18,8 +18,8 @@
 # pico_test_synth.ui.
 #
 # NEEDS a build with audiofilters and audiodelays for the drive and delay
-# knobs and the 24 dB filter. Without them the demo still runs -- the
-# voice's own 12 dB Biquad only -- and says so at boot.
+# knobs and the 24 dB filter. Without them the demo still runs (the
+# voice's own 12 dB Biquad only) and says so at boot.
 #
 #   tap the button   -> next pair of parameters (9 pages)
 #   hold the button  -> play / pause (and save the knobs to /tbish2.json)
@@ -83,7 +83,7 @@ GATE = 0.75  # traditional 303 gate length, as a fraction of a step
 # knob: 0.75 of 3000 Hz falls to 750, two octaves.
 #
 # For that sweep to be heard, `decay` (the FILTER fall) must be SHORTER
-# than the gate -- 94 ms here -- and the amp decay LONGER, so the note is
+# than the gate (94 ms here) and the amp decay LONGER, so the note is
 # still loud while the cutoff falls. Equal times just sound like a pluck.
 # fmt: off
 patch = Patch(
@@ -96,7 +96,7 @@ patch = Patch(
     envmod=0.75,
     decay=0.09,         # FILTER fall time, seconds
     amp_env=[0.001, 0.25, 0.0, 0.02],   # sustain 0: every step plucks
-    fenv_curve=3,       # fast drop, long tail -- reads as "analog"
+    fenv_curve=3,       # fast drop, long tail; reads as "analog"
     accent=0.5,
     accent_cutoff=4000,  # Hz added at full accent
     accent_q=0.8,        # resonance added at full accent
@@ -131,7 +131,7 @@ try:
     hw.mixer.voice[0].play(bass.output)
     print("filter: 24 dB/octave (1 extra stage)")
 except ImportError:
-    print("no audiofilters in this build -- 12 dB/oct, no drive, no delay")
+    print("no audiofilters in this build; 12 dB/oct, no drive, no delay")
     hw.mixer.voice[0].play(bass.synthio)
 
 # --- the 18 parameters, in knob-pair order -------------------------------
@@ -211,7 +211,7 @@ def param_text(p):
 
 # --- the sequencer -------------------------------------------------------
 # StepSequencer holds ONE steps list of fixed length, so switching pattern
-# means rewriting it in place -- which is why all four are the same length.
+# means rewriting it in place, which is why all four are the same length.
 
 
 def on_step(note, vel, gate, on):
@@ -222,7 +222,7 @@ def on_step(note, vel, gate, on):
 
 
 def off_step(note, vel, gate, on):
-    # `note` arrives already transposed -- the same tuple on_func got
+    # `note` arrives already transposed; the same tuple on_func got
     if on and note != 0:
         bass.note_off(note)
 
@@ -341,7 +341,7 @@ while True:
     if now - last_ui > UI_INTERVAL:
         last_ui = now
         update_ui()
-        # not on a pass that just built a voice -- a full frame is ~9.6 ms
+        # not on a pass that just built a voice; a full frame is ~9.6 ms
         # of I2C against an 11.6 ms mixer refill deadline
         if ui.dirty and not touched:
             display.refresh()

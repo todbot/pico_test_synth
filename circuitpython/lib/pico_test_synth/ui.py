@@ -24,7 +24,7 @@
 #
 #   * The SSD1306 is addressed in 8-row pages and displayio rounds every
 #     dirty rectangle out to a page boundary, so each element is aligned to
-#     one -- a label straddling three pages costs 50% more than one fitting
+#     one; a label straddling three pages costs 50% more than one fitting
 #     in two. terminalio.FONT is 6x12 with ascent 10, so a Label's top row
 #     is `y - 5*scale`; the y values below come from that.
 #   * Nothing is wider than one 64px column, so the biggest single transfer
@@ -50,7 +50,7 @@ class SynthUI(displayio.Group):
     """Two-parameter knob display over a ``paramset.ParamSet``.
 
     Holds the ParamSet itself rather than copies, so there is nothing to
-    keep in sync -- whatever the pots wrote is what gets drawn.
+    keep in sync: whatever the pots wrote is what gets drawn.
 
     ``text_func(param)`` formats one param's value; it exists so a caller
     can special-case a param whose value is not really a number (the
@@ -110,7 +110,7 @@ class SynthUI(displayio.Group):
     def update(self, oct_name=""):
         """Redraw from the ParamSet. Returns True if anything changed.
 
-        Does NOT refresh the display -- the caller picks the moment, so
+        Does NOT refresh the display: the caller picks the moment, so
         the I2C burst can be kept out of the same pass as a note-on.
         """
         ps = self.param_set

@@ -14,7 +14,7 @@
 # SwarmSynth stacks up to 8 detuned oscillators on ONE note. It is
 # mono = True, so the 16 pads behave like a pitch ribbon: touching a new
 # one steals the sounding voice and glides to it. That is what keeps it
-# inside synthio's 24-note budget -- eight oscillators is eight Notes, and
+# inside synthio's 24-note budget: eight oscillators is eight Notes, and
 # there is only ever one key down.
 #
 #   tap the button   -> next pair of parameters (4 pages)

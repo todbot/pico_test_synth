@@ -17,5 +17,5 @@ from pico_test_synth import Hardware
 
 hw = Hardware()                  # audio running; 22050 stereo by default
 display = hw.setup_display()     # opt-in
-hw.setup_touch("up")             # opt-in -- "down" for pico_test_synth1
+hw.setup_touch("up")             # opt-in: "down" for pico_test_synth1
 ```

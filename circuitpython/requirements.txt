@@ -11,7 +11,7 @@ adafruit_display_text
 # Only tbish/ still needs this. pico_test_synth's Hardware.check_touch()
 # deliberately does not use it: the pads are a capacitive threshold, not a
 # bouncing switch, and the debouncer's Python was about half the cost of a
-# 16-pad scan -- the single most expensive thing in a typical main loop.
+# 16-pad scan; the single most expensive thing in a typical main loop.
 adafruit_debouncer
 
 # github.com/todbot/CircuitPython_TMIDI
@@ -21,7 +21,7 @@ tmidi
 # tbish2/, synthtools_polysynth/ and the synthtools_* demos.
 synthtools
 
-# Local to this repo: the board itself -- the Hardware class plus the
+# Local to this repo: the board itself; the Hardware class plus the
 # optional general two-pot UI. circup installs from a path as happily as
 # from the bundle; see install_module() in circup/backends.py, which
 # checks os.path.exists() on the name first, and install_module_py(),

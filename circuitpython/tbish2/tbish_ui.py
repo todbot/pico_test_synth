@@ -33,7 +33,7 @@ class TBishUI(displayio.Group):
     """Two-parameter knob display over a ``synthtools.paramset.ParamSet``.
 
     Holds the ParamSet rather than copies of its values, so there is
-    nothing to keep in sync -- whatever the pots wrote is what gets drawn.
+    nothing to keep in sync: whatever the pots wrote is what gets drawn.
 
     ``text_func(param)`` formats one param's value, so a caller can
     special-case one whose value is not really a number (the waveform

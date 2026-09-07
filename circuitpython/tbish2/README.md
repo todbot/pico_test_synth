@@ -1,6 +1,6 @@
 # TBish2 synth
 
-A TB-303 inspired monophonic bass synth — [`tbish/`](../tbish/) rebuilt on
+A TB-303 inspired monophonic bass synth: [`tbish/`](../tbish/) rebuilt on
 [`synthtools`](https://github.com/todbot/CircuitPython_SynthTools)'
 `BasslineSynth`.
 
@@ -27,7 +27,7 @@ Four of tbish's eight files are gone into the library:
 | `tbish_synth.py` | `synthtools.BasslineSynth` |
 | `tbish_sequencer.py` | `synthtools.step_sequencer.StepSequencer` |
 | `paramset.py` | `synthtools.paramset` |
-| `pitch_glider.py` | dropped — slide is `Synth.mono` + `glide_time` |
+| `pitch_glider.py` | dropped; slide is `Synth.mono` + `glide_time` |
 | `synth_setup_pts.py` | `pico_test_synth.Hardware`, shared |
 
 `tbish/` is left exactly as it was.
@@ -51,12 +51,12 @@ install the libraries from `circuitpython/`:
 circup install -r requirements.txt
 ```
 
-That covers the local `lib/pico_test_synth` board package too — circup
+That covers the local `lib/pico_test_synth` board package too; circup
 installs from a path as readily as from the bundle.
 
 `boot.py` is what makes the filesystem writable from the board's side.
 Without it, saving the knobs on pause fails and the demo prints a note
-saying so — everything else works fine.
+saying so: everything else works fine.
 
 ```
 circup install synthtools adafruit_display_text \
@@ -65,12 +65,12 @@ circup install synthtools adafruit_display_text \
 
 Needs a build with `audiofilters` and `audiodelays` for the 24 dB filter,
 drive and delay. Without them it still runs on the voice's own 12 dB
-Biquad and says so at boot. Distortion is enabled on RP2350 only —
+Biquad and says so at boot. Distortion is enabled on RP2350 only:
 `tbish/tbish_synth.py` found it too expensive for an RP2040.
 
 ## Two parameters changed units from `tbish`
 
-Not renames — if you carry numbers over by hand, convert them:
+Not renames, if you carry numbers over by hand, convert them:
 
 - **`decay`** was a 0–1 fraction of the step time; it is now **seconds**,
   and it drives the *filter* fall only. The amp's decay is its own knob

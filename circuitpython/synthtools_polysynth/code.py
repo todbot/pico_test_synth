@@ -12,7 +12,7 @@
 # Polyphony: the patch has detune=1.0, so one synthio Note per pad, and all
 # sixteen down still fit synthio's 24-note budget. Turning the detune knob
 # (page 7) up spends TWO Notes per pad, which puts a full hand-spread over
-# the ceiling -- audible as dropped notes, not a crash.
+# the ceiling: audible as dropped notes, not a crash.
 
 import time
 
@@ -30,7 +30,7 @@ VELOCITY = 100  # touch pads have no velocity
 # how the pads are wired; a pico_test_synth2 can go either way, see
 # Hardware.setup_touch()
 TOUCH_PULL = "up"
-OCTAVES = (36, 48, 60)  # C2, C3, C4 -- pad 0's note
+OCTAVES = (36, 48, 60)  # C2, C3, C4: pad 0's note
 # A pot never reads exactly 0, and SubtractiveSynth spends a SECOND Note per
 # key for any detune that isn't exactly 1.0. Without this deadzone every
 # patch would silently be dual-oscillator, 32 Notes against a budget of 24.

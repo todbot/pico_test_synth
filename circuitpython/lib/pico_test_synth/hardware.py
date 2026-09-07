@@ -15,8 +15,8 @@
 #
 # The display, the touch pads and the MIDI UART are opt-in: each costs
 # libraries, RAM and pins a given program may not want. Explicit calls
-# rather than lazy properties, so the order stays visible at the call site
-# -- setup_display() takes the screen away from the REPL, so a program
+# rather than lazy properties, so the order stays visible at the call site:
+# setup_display() takes the screen away from the REPL, so a program
 # wants its startup prints to happen first.
 #
 # Libraries needed:
@@ -39,8 +39,8 @@ import synthio
 SAMPLE_RATE = 22050
 CHANNEL_COUNT = 2
 # In BYTES: audiomixer splits it into two 1024-byte halves, 256 stereo
-# frames each. One plays while the other refills, so one half -- 11.6 ms at
-# 22.05 kHz, 5.8 at 44.1 -- is the deadline the main loop has to hit. More
+# frames each. One plays while the other refills, so one half (11.6 ms at
+# 22.05 kHz, 5.8 at 44.1) is the deadline the main loop has to hit. More
 # than 4096 adds too much lag.
 BUFFER_SIZE = 2048
 
@@ -116,7 +116,7 @@ class Hardware:
 
         self.knobA = analogio.AnalogIn(knobA_pin)
         self.knobB = analogio.AnalogIn(knobB_pin)
-        # filter state, kept as ints -- see read_pots()
+        # filter state, kept as ints, see read_pots()
         self._knobA_filt = self.knobA.value
         self._knobB_filt = self.knobB.value
 
@@ -142,7 +142,7 @@ class Hardware:
         self.mixer.voice[0].play(self.synth)
         self.mixer.voice[0].level = volume
 
-        # note: no synth.envelope here -- synthtools' Synth gives every
+        # note: no synth.envelope here, synthtools' Synth gives every
         # Note its own, and a global one would override it
 
     # --- opt-in hardware --------------------------------------------------
@@ -172,7 +172,7 @@ class Hardware:
         """Set up the 16 touch pads. Returns the list of TouchIns.
 
         ``pull`` picks the pin's internal resistor, which depends on how
-        the pads are wired -- a pico_test_synth2 can be either way:
+        the pads are wired: a pico_test_synth2 can be either way:
 
         ``"up"``
             internal pull-up (the default, and the only one that works on
@@ -212,7 +212,7 @@ class Hardware:
 
         The last couple of counts are snapped rather than shifted. A
         right-shift floors, so on its own the average stalls short of the
-        endpoints -- and a pot at full scale reading 0.99998 puts
+        endpoints, and a pot at full scale reading 0.99998 puts
         ``int(knobval * vmax)`` on vmax - 1, making a DISCRETE parameter's
         top choice unreachable. Below a delta of 3 the shift cannot move a
         full count, so snap instead.
@@ -264,8 +264,8 @@ class Hardware:
     def touch_hold(self, i):
         """How hard pad ``i`` is pressed, over its threshold.
 
-        Takes its own reading, so it costs a full settling read per call
-        -- fine for the one pad you care about, not for polling all 16.
+        Takes its own reading, so it costs a full settling read per call:
+        fine for the one pad you care about, not for polling all 16.
         Negative means not touched.
         """
         touchin = self.touchins[i]

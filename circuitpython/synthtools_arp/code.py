@@ -13,7 +13,7 @@
 #
 # Each pad you hold is a ROOT note. The "chord" parameter picks a set of
 # intervals from synthtools.arpeggiator.patterns, and every held root
-# contributes those intervals to the arpeggio -- so one pad is an
+# contributes those intervals to the arpeggio, so one pad is an
 # arpeggiated chord and three pads is a long melodic sequence.
 #
 #   tap the button   -> next pair of parameters (5 pages)
