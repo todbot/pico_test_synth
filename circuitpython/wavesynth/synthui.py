@@ -2,8 +2,8 @@ import displayio
 import terminalio
 from adafruit_display_text import bitmap_label as label
 
-from synth_tools.gauge_cluster import GaugeCluster
-from synth_tools.param_scaler import ParamScaler
+from gauge_cluster import GaugeCluster
+from param_scaler import ParamScaler
 
 fnt = terminalio.FONT
 cw = 0xFFFFFF

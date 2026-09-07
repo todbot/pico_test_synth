@@ -1,31 +1,32 @@
 # SPDX-FileCopyrightText: Copyright (c) 2025 Tod Kurt
 # SPDX-License-Identifier: MIT
 #
-# synth_ui_pts.py -- two-knob parameter display for a 128x64 mono OLED
+# pico_test_synth/ui.py -- two-knob parameter display for a 128x64 OLED
 #
-# Shows the two params the pots are currently editing, as name + value +
-# bar, plus a footer with the page number, the octave, and whether each
-# pot has "picked up" its parameter yet.
+# A general two-pot UI over a synthtools ParamSet. OPTIONAL: the package
+# does not import it, so a program that draws its own screen pays nothing
+# for this one.
+#
+#     from pico_test_synth.ui import SynthUI
 #
 #     ui = SynthUI(display, param_set, param_text)
 #     if ui.update("C3"):        # True if anything on screen changed
 #         display.refresh()
 #
-# Everything here is built once. update() only mutates label text and bar
-# widths, and it compares before it writes -- assigning Label.text
-# re-renders the glyph bitmap and marks the region dirty even when the
-# string is identical, so a screen that isn't changing sends no bytes at
-# all. That matters: a full 128x64 frame is 1024 bytes, ~9.5 ms at I2C
-# 1 MHz, against a ~5.8 ms audio refill deadline (see synth_setup_pts).
+# Shows the two params the pots are currently editing, as name + value +
+# bar, plus a footer with the page number and the octave.
+#
+# Everything is built once, and update() compares before assigning: doing
+# so re-renders the glyph bitmap and dirties the region even when the
+# string is identical, so an unchanging screen sends no bytes at all.
 #
 # Two layout rules keep the cost down when something DOES change:
 #
-#   * The SSD1306 is addressed in 8-row pages, and displayio rounds every
-#     dirty rectangle out to a page boundary. So each element is aligned to
-#     one -- a label whose 12 rows straddle three pages costs 50% more than
-#     one that fits in two. terminalio.FONT is exactly 6x12 with ascent 10,
-#     so a Label's top row is `y - 5*scale`; the y values below are chosen
-#     from that.
+#   * The SSD1306 is addressed in 8-row pages and displayio rounds every
+#     dirty rectangle out to a page boundary, so each element is aligned to
+#     one; a label straddling three pages costs 50% more than one fitting
+#     in two. terminalio.FONT is 6x12 with ascent 10, so a Label's top row
+#     is `y - 5*scale`; the y values below come from that.
 #   * Nothing is wider than one 64px column, so the biggest single transfer
 #     is one scale-2 value label: 60px x 24 rows = 180 bytes, ~1.6 ms.
 
@@ -49,7 +50,7 @@ class SynthUI(displayio.Group):
     """Two-parameter knob display over a ``paramset.ParamSet``.
 
     Holds the ParamSet itself rather than copies, so there is nothing to
-    keep in sync -- whatever the pots wrote is what gets drawn.
+    keep in sync: whatever the pots wrote is what gets drawn.
 
     ``text_func(param)`` formats one param's value; it exists so a caller
     can special-case a param whose value is not really a number (the
@@ -64,10 +65,9 @@ class SynthUI(displayio.Group):
         #: sticky: set by update(), cleared by whoever calls display.refresh()
         self.dirty = True
         # Last (param, value) drawn per column, and the state behind the
-        # footer string. update() compares these BEFORE formatting
-        # anything: two comparisons are free, "%.0f" % val and a footer
-        # join are not. Measured on an rp2040 at 200 MHz, formatting
-        # unconditionally cost 2.9 ms on every idle pass.
+        # footer. Compared BEFORE formatting anything: measured on an
+        # rp2040 at 200 MHz, formatting unconditionally cost 2.9 ms on
+        # every idle pass.
         self._seen = [None] * len(COL_X)
         self._seen_foot = None
 
@@ -110,17 +110,15 @@ class SynthUI(displayio.Group):
     def update(self, oct_name=""):
         """Redraw from the ParamSet. Returns True if anything changed.
 
-        Does NOT refresh the display -- the caller picks the moment, so
+        Does NOT refresh the display: the caller picks the moment, so
         the I2C burst can be kept out of the same pass as a note-on.
         """
         ps = self.param_set
         changed = False
         for i in range(len(COL_X)):
             p = ps.params[ps.idx * ps.nknobs + i]
-            # The entire cost of an idle pass is decided here. Identity
-            # catches a page turn, the float compare catches a knob move;
-            # anything else costs two comparisons and stops, with no
-            # string formatting and no bar arithmetic.
+            # Identity catches a page turn, the float compare catches a
+            # knob move. Anything else stops here, with no formatting.
             seen = self._seen[i]
             if seen is not None and seen[0] is p and seen[1] == p.val:
                 continue
@@ -136,19 +134,12 @@ class SynthUI(displayio.Group):
                 self.bars[i].width = w
                 changed = True
 
-        # "A*" = this pot is live, "A-" = move it to the stored value to
-        # pick it up. ParamSet.KNOB_PICKUP is why a pot does nothing until
-        # it passes where the parameter already is. Same trick as above:
-        # the state behind the string is cheap to compare, the string is
-        # not, so only build it when that state actually moved.
-        foot = (ps.idx, oct_name) + tuple(ps.is_tracking)
+        # same trick as above: only build the string when its state moved
+        foot = (ps.idx, oct_name)
         if foot != self._seen_foot:
             self._seen_foot = foot
-            marks = "".join(
-                "%s%s " % ("AB"[i], "*" if t else "-") for i, t in enumerate(ps.is_tracking)
-            )
             changed |= self._set_text(
-                self.footer, "P%d/%d %s %s" % (ps.idx + 1, ps.nknobsets, oct_name, marks)
+                self.footer, "P%d/%d  %s" % (ps.idx + 1, ps.nknobsets, oct_name)
             )
 
         self.dirty = self.dirty or changed
