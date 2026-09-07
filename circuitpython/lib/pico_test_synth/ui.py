@@ -17,11 +17,10 @@
 #         display.refresh()
 #
 # Everything here is built once. update() only mutates label text and bar
-# widths, and it compares before it writes -- assigning Label.text
-# re-renders the glyph bitmap and marks the region dirty even when the
-# string is identical, so a screen that isn't changing sends no bytes at
-# all. That matters: a full 128x64 frame is 1024 bytes, ~9.5 ms at I2C
-# 1 MHz, against the mixer's refill deadline (see hardware.py).
+# widths, comparing before updating the display.
+# Assigning Label.text re-renders the glyph bitmap and marks the region dirty
+# even when the string is identical, so a screen that isn't changing sends
+# no bytes at all.
 #
 # Two layout rules keep the cost down when something DOES change:
 #

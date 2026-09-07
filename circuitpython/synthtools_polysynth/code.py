@@ -1,15 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2025 Tod Kurt
 # SPDX-License-Identifier: MIT
 #
-# synthtools_polysynth -- a playable SubtractiveSynth with a screen
-#
-# For a pico_test_synth2. Copy this code.py onto the CIRCUITPY root; the
-# libraries it needs come from the repo's requirements.txt:
-#
-#   circup install -r requirements.txt     (run from circuitpython/)
-#
-# The board itself is the pico_test_synth Hardware class, and the screen
-# is its optional general two-pot UI.
+# synthtools_polysynth -- a playable SubtractiveSynth on pico_test_synth
 #
 # 16 touch pads are a chromatic keyboard, two pots edit 14 synth
 # parameters two at a time, and a 128x64 OLED shows which two.
@@ -29,64 +21,10 @@
 # which puts a full hand-spread over the ceiling -- audible as dropped
 # notes, not a crash.
 #
-# --- why the display code looks paranoid -----------------------------
-#
-# A full 128x64 mono frame is 1024 bytes, ~9.5 ms on the wire at I2C
-# 1 MHz. audiomixer splits its 2048-byte buffer in two, so the deadline to
-# refill one half is 11.6 ms at this rig's 22.05 kHz (it would be 5.8 at
-# 44.1). One careless refresh per loop pass is enough to starve it.
-# Five things keep it quiet, in order of how much they matter:
-#
-#   1. Nothing is re-applied to the synth unless it actually changed.
-#      This is the big one and it is not a display problem at all:
-#      ParamSet.apply_knobset() setattrs every param every call, and
-#      attack/decay/sustain/release each rebuild a synthio.Envelope and
-#      push it to every sounding note. That is an allocation 20x a second
-#      for a pot nobody is touching. See update_ui() below.
-#   (That scan was 8.2 ms until Hardware.check_touch() dropped
-#   adafruit_debouncer -- see its docstring for the measurements.)
-#
-#   2. SynthUI.update() compares the raw float BEFORE formatting anything,
-#      so an idle pass does no string work at all.
-#   3. The whole UI pass is throttled to UI_INTERVAL.
-#   4. One explicit display.refresh(), and only when something changed.
-#   5. The refresh is skipped on any pass that handled a pad, so the I2C
-#      burst never lands in the same iteration as a note_on() building a
-#      voice. Costs at most one UI_INTERVAL of display lag.
-#
-# Measured on a pico_test_synth2 (rp2040 at 200 MHz), which is what those
-# are worth in practice:
-#
-#   idle UI pass (update + clean refresh)   0.24 + 0.24 ms
-#   one value+bar changes, update only      6.8 ms   (glyph re-render)
-#   ...and its refresh()                    9.6 ms   (I2C, chunked)
-#   a page change, all six elements         41 + 34 ms
-#   check_touch(), all 16 pads              5.1 ms
-#
-# So the loop is dominated by the touch scan and runs near 150-200 Hz, an
-# idle screen costs about 2% of it, and a page turn is a ~75 ms hiccup you
-# can feel in touch latency. That last one is the honest weak spot: it is
-# 8 label re-renders in one iteration. Audio survives it because displayio
-# runs background tasks between I2C chunks and the VM yields between
-# bytecodes -- but if it ever does click, spread the page repaint over
-# several passes rather than making the whole thing cheaper.
-#
-# None of the above was the cause of the once-a-second glitch this rig had
-# at 44.1 kHz, which is worth recording so nobody re-tunes the display
-# chasing it. Measured with hands off the controls: the pots wrote a
-# parameter 0 times in 100 passes, no single touch read exceeded 0.38 ms,
-# and nothing in this loop has a 1 Hz period at all. It was render
-# headroom, and the fix is the sample rate Hardware defaults to.
 
 import time
 
 import microcontroller
-
-# rp2040 boots at 125 MHz. Reading all 16 touch pads is the biggest thing
-# in this loop, so overclock before anything else is set up. Measured on
-# a pico_test_synth2: 10.89 ms per 16-pad scan at 125 MHz, 8.20 ms at 200.
-# (Only part of the scan is CPU -- most of it is fixed RC settling time,
-# which is why 1.6x the clock is nowhere near 1.6x the speed.)
 microcontroller.cpu.frequency = 200_000_000
 
 from pico_test_synth import Hardware
@@ -122,13 +60,8 @@ patch = Patch(name="touch lead", wave="ASAW", detune=1.0,
               filt_track=0.0)
 # fmt: on
 
-# A Biquad above Nyquist is undefined, and Hardware runs at 22.05 kHz
-# to stop this rig glitching -- so 11 kHz, not the class default of 20 kHz,
-# is the ceiling. The cutoff bus can genuinely reach it: 4000 Hz of filt_f
-# plus 6000 of envelope plus keyboard tracking sums well past 11 kHz on the
-# top pads. Set on the SUBCLASS, so the library's Synth is left alone, and
-# BEFORE construction -- the shared clamp bakes this in at graph-build time.
 hw = Hardware()
+# set max filter based on sample rate (nyquist)
 SubtractiveSynth.FILT_F_MAX = hw.sample_rate * 0.45
 
 synth = SubtractiveSynth(hw.synth, patch)

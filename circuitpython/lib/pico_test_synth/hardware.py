@@ -88,8 +88,6 @@ _KNOB_HALF = 1 << (KNOB_SHIFT - 1)  # rounds the shift to nearest
 # 65536) so a pot at full scale reads exactly 1.0.
 _ADC_SCALE = 1.0 / 65535
 
-_NO_EVENTS = ()  # shared, so an idle check_touch() allocates nothing
-
 TOUCH_PULLS = {"up": digitalio.Pull.UP, "down": digitalio.Pull.DOWN, None: None}
 
 
@@ -136,8 +134,6 @@ class Hardware:
         self.display = None
         self.midi_uart = None
         self.touchins = []
-        self._touch_thresh = []
-        self._touch_raw = []
         self._touch_last = []
 
         # audio last, so the slow setup above is done before it starts
@@ -208,10 +204,6 @@ class Hardware:
             touchin = touchio.TouchIn(pin, pull_type)
             touchin.threshold = int(touchin.threshold * 1.1)  # noise protec
             self.touchins.append(touchin)
-            # cached: check_touch() compares against this on every pad on
-            # every pass, and a property read is not free
-            self._touch_thresh.append(touchin.threshold)
-            self._touch_raw.append(touchin.raw_value)
             self._touch_last.append(False)
         return self.touchins
 
@@ -266,55 +258,39 @@ class Hardware:
     def check_touch(self):
         """Scan the pads, return keypad-like Events for any that changed.
 
-        Same shape as keys.events.get() gives, so pads and the button can
-        be handled by the same code: each Event has .key_number and
-        .pressed.
+        Similar to what keys.events.get() gives: each Event has
+        .key_number and .pressed.
 
-        This is the most expensive thing in a typical main loop, so it is
-        worth knowing what it costs. Measured on a pico_test_synth2
-        (rp2040 at 200 MHz, CircuitPython 10.3.0-alpha.3), 16 pads:
+        This is the most expensive thing in a typical main loop, and
+        nearly all of the cost is the pads' RC settling time, which no
+        code can remove. For 16 pads, measured on a Pico on pico_test_synth2:
 
             adafruit_debouncer, as this used to do   7.90 ms
-            this, raw_value + cached threshold       5.09 ms
             16 raw reads and nothing else            4.04 ms
 
-        So dropping the debouncer is worth 2.8 ms a pass -- a loop
-        ceiling of ~197 Hz instead of ~127 -- and the 4.04 ms floor is
-        fixed RC settling that no code can remove. The pads are a
-        capacitive threshold, not a bouncing switch, so there was nothing
-        for a debouncer to do in the first place.
-
-        Reading raw_value and comparing here, rather than letting .value
-        compare in C, costs about 0.4 ms of that. It buys touch_hold()
-        needing no second settling read, and pressure that is guaranteed
-        to come from the same scan as the events.
-
-        No allocation at all on a pass where nothing changed.
+        Returns an empty tuple, not None, when nothing changed.
         """
         events = None
         touchins = self.touchins
-        raws = self._touch_raw
-        thresh = self._touch_thresh
         last = self._touch_last
         for i in range(len(touchins)):
-            raw = touchins[i].raw_value
-            raws[i] = raw
-            pressed = raw > thresh[i]
+            pressed = touchins[i].value
             if pressed != last[i]:
                 last[i] = pressed
                 if events is None:
                     events = []
                 events.append(keypad.Event(i, pressed))
-        return events if events is not None else _NO_EVENTS
+        return events or ()
 
     def touch_hold(self, i):
         """How hard pad ``i`` is pressed, over its threshold.
 
-        Uses the reading check_touch() already took, so this does no
-        hardware read at all -- call check_touch() first. Negative means
-        not touched.
+        Takes its own reading, so it costs a full settling read per call
+        -- fine for the one pad you care about, not for polling all 16.
+        Negative means not touched.
         """
-        return self._touch_raw[i] - self._touch_thresh[i]
+        touchin = self.touchins[i]
+        return touchin.raw_value - touchin.threshold
 
     # --- outputs ----------------------------------------------------------
 
