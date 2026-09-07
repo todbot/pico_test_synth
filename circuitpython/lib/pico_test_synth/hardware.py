@@ -34,14 +34,10 @@ import keypad
 import pwmio
 import synthio
 
-# 22050, not 44100. Measured on a pico_test_synth2: at 44.1 kHz this rig
-# clicks about once a second no matter how many notes are held, and no
-# buffer size fixes it -- past 4096 bytes the added lag is worse than the
-# glitch. Halving the rate does fix it, and NOT merely by stretching the
-# buffer: 4096 bytes at 44.1 kHz and 2048 at 22.05 kHz give the identical
-# 11.6 ms deadline, yet only the latter is clean. The difference is render
-# cost. A bigger buffer only postpones a stall; half the sample rate is
-# half the samples to compute, so the renderer can catch up after one.
+# Sample rate:  22050 for pico (RP2040).
+# Pico2 (RP2350) can do 44100 feel free to change it.
+# Buffer size: 4096 bytes, anything more adds too much lag.
+# 4096 bytes @ 44.1 kHz and 2048 at 22.05 kHz give a 11.6 ms deadline.
 #
 # NOTE: this halves Nyquist to 11 kHz, and a synthio.Biquad cutoff above
 # that is undefined. Cap it from hw.sample_rate, e.g.
