@@ -41,7 +41,7 @@ WAVES = ("SAW", "SQU", "TRI", "SIN", "ASAW", "ATRI", "ASQU", "SSQU")
 
 # --- the synth -----------------------------------------------------------
 # fmt: off
-patch = Patch(name="touch lead", wave="ASAW", detune=1.0,
+patch = Patch(name="touch lead", wave="ASAW", detune=1.001,
               filt_type="LPF", filt_f=1500, filt_q=1.4,
               amp_env=[0.02, 0.20, 0.7, 0.35],
               vib_rate=5.5, vib_depth=0.0,
@@ -63,16 +63,15 @@ PARAMS = [
     # 60-4000, not the filter's full range: the pot is LINEAR, so a 20 kHz
     # top end would bury every useful bass cutoff in the first few percent
     # of travel. The envelope still reaches higher.
-    Param("cutoff",   patch.filt_f,       60,    4000,  "%.0f",  "filt_f"),
-    # 0.6-6 is the useful span: below it the filter is overdamped, above
-    # it squeals.
+    Param("cutoff",   patch.filt_f,       20,    4000,  "%.0f",  "filt_f"),
     Param("reso",     patch.filt_q,       0.6,    6.0,  "%.1f",  "filt_q"),
 
+    # wave has no objattr: it is an INDEX, not the string synth.wave wants
+    Param("wave",     WAVES.index(patch.wave), 0, len(WAVES) - 1, "%.0f", None),
+    Param("detune",   patch.detune,       1.0,   1.01,  "%.3f",  "detune"),
+    
     Param("attack",   patch.amp_env[0],   0.0,   2.0,   "%.2f",  "attack_time"),
     Param("release",  patch.amp_env[3],   0.01,  3.0,   "%.2f",  "release_time"),
-
-    Param("decay",    patch.amp_env[1],   0.0,   2.0,   "%.2f",  "decay_time"),
-    Param("sustain",  patch.amp_env[2],   0.0,   1.0,   "%.2f",  "sustain_level"),
 
     # bipolar on purpose: a NEGATIVE amount sweeps the cutoff DOWN while the
     # key is held, the 303-style squelch. Exactly 0 builds no envelope node
@@ -86,10 +85,6 @@ PARAMS = [
 
     Param("vibrate",  patch.vib_rate,     0.1,   12.0,  "%.1f",  "vib_rate"),
     Param("vibdepth", patch.vib_depth,    0.0,   0.05,  "%.3f",  "vib_depth"),
-
-    # wave has no objattr: it is an INDEX, not the string synth.wave wants
-    Param("wave",     WAVES.index(patch.wave), 0, len(WAVES) - 1, "%.0f", None),
-    Param("detune",   patch.detune,       1.0,   1.01,  "%.3f",  "detune"),
 ]
 # fmt: on
 
@@ -126,7 +121,7 @@ for _p in PARAMS:
         raise ValueError("param name too wide for the screen: '%s'" % _p.name)
     apply_param(_p)
 
-print("synthtools touch demo: 16 pads, tap button for page, hold for octave")
+print("synthtools polysynth: 16 pads, tap button for page, hold for octave")
 
 # --- hardware ------------------------------------------------------------
 # setup_display() takes over the screen from the console, so print first.

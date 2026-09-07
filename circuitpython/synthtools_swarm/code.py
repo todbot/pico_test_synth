@@ -65,14 +65,14 @@ hw.set_volume(0.9)
 PARAMS = [
     # both in BEND units, 1.0 = an octave, so the ranges are narrow on
     # purpose: past ~0.03 of spread it is a chord, not a chorus
-    Param("spread",   patch.swarm_spread,  0.0,  0.03,  "%.3f",  "swarm_spread"),
+    Param("spread",   patch.swarm_spread,  0.0,  2.0,  "%.3f",  "swarm_spread"),
     Param("drift",    patch.swarm_drift,   0.0,  0.02,  "%.3f",  "swarm_drift"),
 
     # applies at the NEXT note-on: the fan of oscillators is built there
     Param("count",    patch.swarm_count,   1,    SwarmSynth.MAX_OSCS, "%1d", "swarm_count"),
     Param("glide",    synth.glide_time,    0.0,  1.5,   "%.2f",  "glide_time"),
 
-    Param("cutoff",   patch.filt_f,        60,   4000,  "%4d",   "filt_f"),
+    Param("cutoff",   patch.filt_f,        60,   6000,  "%4d",   "filt_f"),
     Param("reso",     patch.filt_q,        0.6,  6.0,   "%.1f",  "filt_q"),
 
     # wave has no objattr: it is an INDEX, not the string synth.wave wants
