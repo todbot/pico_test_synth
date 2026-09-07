@@ -6,21 +6,18 @@
 # part of https://github.com/todbot/pico_test_synth
 #
 # One Hardware object owns the board: audio, the two pots, the button,
-# the 16 touch pads, the OLED, the UART MIDI pins and the LED. This
-# replaces the older synth_setup_pts.py, which did the same job as module
-# globals set up at import.
+# the 16 touch pads, the OLED, the UART MIDI pins and the LED.
 #
 #     from pico_test_synth import Hardware
 #     hw = Hardware()                 # audio is running after this
 #     display = hw.setup_display()    # opt-in, see below
 #     hw.setup_touch("up")
 #
-# Audio, the pots and the button are built in __init__ because everything
-# needs them. The display, the touch pads and the MIDI UART are opt-in:
-# each costs libraries, RAM and pins that a given program may not want.
-# They are explicit calls rather than lazy properties so that the order
-# stays visible at the call site -- setup_display() takes the screen away
-# from the REPL, so a program wants its startup prints to happen first.
+# The display, the touch pads and the MIDI UART are opt-in: each costs
+# libraries, RAM and pins a given program may not want. Explicit calls
+# rather than lazy properties, so the order stays visible at the call site
+# -- setup_display() takes the screen away from the REPL, so a program
+# wants its startup prints to happen first.
 #
 # Libraries needed:
 #   circup install adafruit_displayio_ssd1306   (only for setup_display)
@@ -34,20 +31,17 @@ import keypad
 import pwmio
 import synthio
 
-# Sample rate:  22050 for pico (RP2040).
-# Pico2 (RP2350) can do 44100 feel free to change it.
-# Buffer size: 4096 bytes, anything more adds too much lag.
-# 4096 bytes @ 44.1 kHz and 2048 at 22.05 kHz give a 11.6 ms deadline.
+# 22050 for a Pico (RP2040); a Pico 2 (RP2350) can do 44100.
 #
-# NOTE: this halves Nyquist to 11 kHz, and a synthio.Biquad cutoff above
-# that is undefined. Cap it from hw.sample_rate, e.g.
+# NOTE: Nyquist is 11 kHz here, and a synthio.Biquad cutoff above that is
+# undefined. Cap it from hw.sample_rate, e.g.
 #   SubtractiveSynth.FILT_F_MAX = hw.sample_rate * 0.45
 SAMPLE_RATE = 22050
 CHANNEL_COUNT = 2
-# In BYTES, and audiomixer splits it into TWO half-buffers: 2048 gives two
-# 1024-byte halves = 256 stereo frames. One half plays while the other
-# refills, so one half -- 11.6 ms at 22.05 kHz, 5.8 at 44.1 -- is the
-# deadline the main loop has to hit.
+# In BYTES: audiomixer splits it into two 1024-byte halves, 256 stereo
+# frames each. One plays while the other refills, so one half -- 11.6 ms at
+# 22.05 kHz, 5.8 at 44.1 -- is the deadline the main loop has to hit. More
+# than 4096 adds too much lag.
 BUFFER_SIZE = 2048
 
 DW, DH = 128, 64  # display width/height
@@ -76,16 +70,13 @@ touch_pins = (
 # fmt: on
 
 # Knob filter, as a right-shift: the new reading gets 1/(2**KNOB_SHIFT) of
-# the weight. 2 is a fairly heavy filter, matching the 0.75 this used to
-# use in floating point. See read_pots() for why it is a shift.
-# Measured on device: read_pots() costs 0.23 ms and settles the pot to
-# 0.13% of full scale, which ParamSet's deadband then swallows entirely.
+# the weight. Measured on device, read_pots() costs 0.23 ms and settles the
+# pot to 0.13% of full scale, which ParamSet's deadband then swallows.
 KNOB_SHIFT = 2
 _KNOB_HALF = 1 << (KNOB_SHIFT - 1)  # rounds the shift to nearest
 
-# AnalogIn.value is 0-65535; multiply by this rather than dividing, since
-# a multiply is the cheaper of the two on a soft-float target. 65535 (not
-# 65536) so a pot at full scale reads exactly 1.0.
+# AnalogIn.value is 0-65535; multiply rather than divide, cheaper on a
+# soft-float target. 65535, not 65536, so full scale reads exactly 1.0.
 _ADC_SCALE = 1.0 / 65535
 
 TOUCH_PULLS = {"up": digitalio.Pull.UP, "down": digitalio.Pull.DOWN, None: None}
@@ -115,9 +106,8 @@ class Hardware:
         self.channel_count = channel_count
         self.buffer_size = buffer_size
 
-        # Do this first: it puts the Pico's regulator in PWM mode, which
-        # has lower ripple than the default PFM and so a quieter noise
-        # floor on the DAC. Costs a little efficiency, irrelevant on USB.
+        # regulator into PWM mode: lower ripple than the default PFM, so a
+        # quieter noise floor on the DAC
         self.pwr_mode = digitalio.DigitalInOut(pico_pwr_pin)
         self.pwr_mode.switch_to_output(value=True)
 
@@ -160,11 +150,9 @@ class Hardware:
     def setup_display(self):
         """Bring up the 128x64 SSD1306 OLED. Returns it, and sets .display.
 
-        auto_refresh is OFF: a full frame is 1024 bytes, ~9.5 ms on the
-        wire at I2C 1 MHz, against the mixer's refill deadline (half of
-        buffer_size, so 11.6 ms at 22.05 kHz). displayio does chunk the
-        transfer and run background tasks between chunks, but refresh
-        deliberately anyway, and only when something actually changed.
+        auto_refresh is OFF: a full frame is ~9.5 ms on the wire at I2C
+        1 MHz, against an 11.6 ms mixer refill deadline. Refresh
+        deliberately, and only when something actually changed.
         """
         import adafruit_displayio_ssd1306
         import busio
@@ -193,9 +181,6 @@ class Hardware:
             internal pull-down; pico_test_synth1 with a Pico 1
         ``None``
             no internal pull, for pads with their own resistor
-
-        It is a string rather than a digitalio.Pull so a caller doesn't
-        have to import digitalio just to name one.
         """
         import touchio
 
@@ -221,25 +206,19 @@ class Hardware:
     def read_pots(self):
         """Read both knobs, filtered. Returns a pair of 0.0-1.0 floats.
 
-        The filter is an exponential moving average done in INTEGER math,
-        on the raw 0-65535 reading, with one float multiply at the end.
-        RP2040 is a Cortex-M0+ with no FPU, so every float operation is
-        software-emulated; this way a call costs two ADC reads and two
-        float multiplies rather than four reads and about ten float ops.
+        An exponential moving average in INTEGER math on the raw 0-65535
+        reading, with one float multiply at the end: the RP2040 is a
+        Cortex-M0+ with no FPU, so every float operation is emulated.
 
         The last couple of counts are snapped rather than shifted. A
         right-shift floors, so on its own the average stalls short of the
-        endpoints -- and that matters: a pot at full scale reading
-        0.99998 makes ``int(knobval * vmax)`` for a DISCRETE parameter
-        land on vmax - 1, so its top choice becomes unreachable. Below a
-        delta of 3 the shift cannot move a full count, so snap instead;
-        above it, the shift always moves at least one. Two integer
-        comparisons, and the average always converges.
+        endpoints -- and a pot at full scale reading 0.99998 puts
+        ``int(knobval * vmax)`` on vmax - 1, making a DISCRETE parameter's
+        top choice unreachable. Below a delta of 3 the shift cannot move a
+        full count, so snap instead.
 
-        Do this here because synthtools' ParamSet does NOT smooth: it
-        takes a ``knob_smooth`` argument, stores it, and never reads it.
-        It only deadbands. Anything wanting the unfiltered value can read
-        ``hw.knobA.value`` directly.
+        Smoothing lives here because synthtools' ParamSet only deadbands.
+        Anything wanting the raw value can read ``hw.knobA.value``.
         """
         d = self.knobA.value - self._knobA_filt
         self._knobA_filt += d if -3 < d < 3 else (d + _KNOB_HALF) >> KNOB_SHIFT
@@ -261,12 +240,12 @@ class Hardware:
         Similar to what keys.events.get() gives: each Event has
         .key_number and .pressed.
 
-        This is the most expensive thing in a typical main loop, and
-        nearly all of the cost is the pads' RC settling time, which no
-        code can remove. For 16 pads, measured on a Pico on pico_test_synth2:
+        The most expensive thing in a typical main loop, and nearly all of
+        it is the pads' RC settling time, which no code can remove. For 16
+        pads, measured on a Pico on pico_test_synth2:
 
-            adafruit_debouncer, as this used to do   7.90 ms
-            16 raw reads and nothing else            4.04 ms
+            via adafruit_debouncer      7.90 ms
+            16 raw reads, nothing else  4.04 ms
 
         Returns an empty tuple, not None, when nothing changed.
         """

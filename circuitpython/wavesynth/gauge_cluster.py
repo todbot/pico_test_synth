@@ -7,10 +7,7 @@
 
 A group of `displayio` objects that display a list of values graphically.
 
-Part of synthtools; vendored here as a flat module.
-synthtools/ui/ has no __init__.py and is not shipped by
-`circup install synthtools`, so it cannot be imported as
-synthtools.ui.* on-device. Keep in sync by hand.
+Vendored flat copy of synthtools/gauge_cluster.py; keep in sync by hand.
 
 """
 

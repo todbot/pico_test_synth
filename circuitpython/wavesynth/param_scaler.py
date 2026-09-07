@@ -14,10 +14,8 @@ move in sync with the knob.  The value will always decrease/increase
 in the same direction as the knob.
 This mirrors how the Deluge synth's "SCALE" mode works.
 
-Part of synthtools; vendored here as a flat module.
-synthtools/ui/ has no __init__.py and is not shipped by
-`circup install synthtools`, so it cannot be imported as
-synthtools.ui.* on-device. Keep in sync by hand.
+Vendored flat copy, predating synthtools/param_scaler.py's fixes. That one
+is authoritative; do not "fix" it to match this file.
 
 """
 

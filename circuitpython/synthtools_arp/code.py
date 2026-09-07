@@ -8,8 +8,8 @@
 #
 #   circup install -r requirements.txt
 #
-# That pulls the synthtools package and the local lib/pico_test_synth
-# board package, whose optional ui module draws the screen here.
+# That pulls synthtools and the local lib/pico_test_synth board package,
+# whose optional ui module draws the screen here.
 #
 # Each pad you hold is a ROOT note. The "chord" parameter picks a set of
 # intervals from synthtools.arpeggiator.patterns, and every held root
@@ -19,11 +19,6 @@
 #   tap the button   -> next pair of parameters (5 pages)
 #   hold the button  -> next octave
 #   hold a pad       -> add its root to the arpeggio
-#
-# The pots use scaled ("catch-up") takeover: a turn ALWAYS moves the
-# value, by an amount scaled so knob and value converge and reach the
-# ends together. No dead travel after a page turn -- see
-# ParamSet.update_knobs_scale() in synthtools.
 
 import time
 
@@ -58,10 +53,8 @@ patch = Patch(name="arp", wave="SAW", detune=1.0,
               fenv_curve=2)
 # fmt: on
 
-# A Biquad above Nyquist is undefined and Hardware runs at 22.05 kHz.
-# Set on the SUBCLASS, BEFORE construction.
 hw = Hardware()
-SubtractiveSynth.FILT_F_MAX = hw.sample_rate * 0.45
+SubtractiveSynth.FILT_F_MAX = hw.sample_rate * 0.45  # SUBCLASS, before constructing
 
 synth = SubtractiveSynth(hw.synth, patch)
 
@@ -87,9 +80,9 @@ PARAMS = [
 # fmt: on
 assert len(PARAMS) % 2 == 0, "PARAMS must be even: two knobs per page"
 
-# KNOB_SCALE, not the default KNOB_PICKUP: a turn always moves the
-# value, scaled so knob and value converge and reach the ends
-# together, instead of the pot being dead until it crosses.
+# KNOB_SCALE, not the default KNOB_PICKUP: a turn always moves the value,
+# scaled so knob and value reach the ends together, instead of the pot
+# being dead until it crosses.
 param_set = ParamSet(PARAMS, num_knobs=2, knob_mode=ParamSet.KNOB_SCALE)
 
 held = {}  # pad number -> the root note it added
@@ -125,12 +118,9 @@ def rebuild_arp():
 def apply_param(p):
     """Push one param. Only some of these are synth attributes.
 
-    A discrete parameter selects with round(), not int(). ParamSet
-    deadbands: it stops updating once the knob is within
-    0.1 * min_change * span of the value, so a pot at full scale leaves
-    p.val a hair under vmax. int() truncates that to vmax - 1 and the last
-    choice becomes unreachable; round() also gives every choice an equal
-    band instead of a zero-width one at the top.
+    Discrete params select with round(), not int(): ParamSet's deadband
+    leaves a full-scale knob a hair under vmax, which int() would truncate
+    to vmax - 1, making the last choice unreachable.
     """
     if p.name == "wave":
         synth.wave = WAVES[round(p.val)]  # index -> name string
@@ -148,10 +138,8 @@ def apply_param(p):
 
 def param_text(p):
     """Format one param. Two of these are names, not numbers."""
-    # A discrete param must be FORMATTED the same way apply_param
-    # SELECTS it. "%d" truncates, so a value of 2.99 would print 2
-    # while round() applied 3 -- the screen disagreeing with the
-    # sound, which reads as a synth bug rather than a display one.
+    # round() to match how apply_param selects, or the screen disagrees
+    # with the sound
     if p.name == "wave":
         return WAVES[round(p.val)]
     if p.name == "chord":
@@ -161,8 +149,6 @@ def param_text(p):
     return p.fmt % p.val
 
 
-# Catch a bad objattr or an over-wide name at boot, not at the page turn
-# that would have shown it. Names are padded to 9 columns on screen.
 for _p in PARAMS:
     if _p.objattr and _p.objattr not in synth._PARAMS:
         raise ValueError("no such synth parameter: '%s'" % _p.objattr)
@@ -210,8 +196,7 @@ def check_button():
     elif time.monotonic() - press_t > HOLD_SECS:
         oct_i = (oct_i + 1) % len(OCTAVES)
         base_note = OCTAVES[oct_i]
-        # roots already down keep the pitch they were pressed at, like a
-        # keyboard; the new octave applies to the next pad pressed.
+        # roots already down keep their pitch; this applies to the next pad
     else:
         param_set.next_knobset()
 

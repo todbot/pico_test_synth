@@ -9,18 +9,10 @@
 #   tap the button   -> next pair of parameters (7 pages)
 #   hold the button  -> next octave (C2 / C3 / C4)
 #
-# The pots use scaled ("catch-up") takeover: a turn ALWAYS moves the
-# value, by an amount scaled so knob and value converge and reach the
-# ends together. No dead travel after a page turn -- see
-# ParamSet.update_knobs_scale() in synthtools.
-#
-
-# Polyphony: the patch has detune=1.0, so one synthio Note per pad. All
-# sixteen pads down plus a few releasing still fits synthio's 24-note
-# budget. Turning the detune knob (page 7) up spends TWO Notes per pad,
-# which puts a full hand-spread over the ceiling -- audible as dropped
-# notes, not a crash.
-#
+# Polyphony: the patch has detune=1.0, so one synthio Note per pad, and all
+# sixteen down still fit synthio's 24-note budget. Turning the detune knob
+# (page 7) up spends TWO Notes per pad, which puts a full hand-spread over
+# the ceiling -- audible as dropped notes, not a crash.
 
 import time
 
@@ -35,16 +27,13 @@ from synthtools.paramset import Param, ParamSet
 UI_INTERVAL = 0.05  # seconds between UI passes (20 Hz)
 HOLD_SECS = 0.7  # button held longer than this = octave, not page
 VELOCITY = 100  # touch pads have no velocity
-# How the touch pads are wired. A pico_test_synth2 can go either way:
-# "up" / "down" use the pin's internal resistor, None means the pads have
-# their own (an rp2040 with neither raises "No pulldown on pin").
+# how the pads are wired; a pico_test_synth2 can go either way, see
+# Hardware.setup_touch()
 TOUCH_PULL = "up"
 OCTAVES = (36, 48, 60)  # C2, C3, C4 -- pad 0's note
-# A pot never reads exactly 0, so the detune knob's bottom end lands on
-# 1.0000002 rather than 1.0 -- and SubtractiveSynth spends a SECOND Note
-# per key for any detune that isn't exactly 1.0. Without this deadzone
-# every patch would silently be dual-oscillator and 16 pads would want
-# 32 Notes against a budget of 24.
+# A pot never reads exactly 0, and SubtractiveSynth spends a SECOND Note per
+# key for any detune that isn't exactly 1.0. Without this deadzone every
+# patch would silently be dual-oscillator, 32 Notes against a budget of 24.
 DETUNE_OFF = 1.0005
 
 # waveform names, from _builders in synthtools/waves.py
@@ -61,27 +50,22 @@ patch = Patch(name="touch lead", wave="ASAW", detune=1.0,
 # fmt: on
 
 hw = Hardware()
-# set max filter based on sample rate (nyquist)
-SubtractiveSynth.FILT_F_MAX = hw.sample_rate * 0.45
+SubtractiveSynth.FILT_F_MAX = hw.sample_rate * 0.45  # SUBCLASS, before constructing
 
 synth = SubtractiveSynth(hw.synth, patch)
 
 # --- the 14 parameters, in knob-pair order -------------------------------
 # Two pots, so params[0:2] are page 1, params[2:4] page 2, and so on.
-# Adding two more Params here gives an 8th page and nothing else changes:
-# that is what ParamSet is for.
-#
-# Every one is seeded from the patch, so the screen matches what is
-# actually sounding at boot.
+# Adding two more gives an 8th page and nothing else changes. Every one is
+# seeded from the patch, so the screen matches what is sounding at boot.
 # fmt: off
 PARAMS = [
-    # 60-4000 rather than the filter's full range: this is a LINEAR pot, so
-    # a 20 kHz top end would bury every useful bass cutoff in the bottom
-    # few percent of travel. 4000 puts 500 Hz at ~11% and the envelope
-    # (up to +6000 Hz) still reaches the top of the audible range.
+    # 60-4000, not the filter's full range: the pot is LINEAR, so a 20 kHz
+    # top end would bury every useful bass cutoff in the first few percent
+    # of travel. The envelope still reaches higher.
     Param("cutoff",   patch.filt_f,       60,    4000,  "%.0f",  "filt_f"),
-    # 0.6-6 is the whole useful span: below 0.6 the filter is overdamped
-    # and the knob does nothing, past 6 it squeals. See Synth.filt_q.
+    # 0.6-6 is the useful span: below it the filter is overdamped, above
+    # it squeals.
     Param("reso",     patch.filt_q,       0.6,    6.0,  "%.1f",  "filt_q"),
 
     Param("attack",   patch.amp_env[0],   0.0,   2.0,   "%.2f",  "attack_time"),
@@ -90,10 +74,9 @@ PARAMS = [
     Param("decay",    patch.amp_env[1],   0.0,   2.0,   "%.2f",  "decay_time"),
     Param("sustain",  patch.amp_env[2],   0.0,   1.0,   "%.2f",  "sustain_level"),
 
-    # bipolar on purpose: a NEGATIVE amount sweeps the cutoff DOWN while
-    # the key is held, which is the 303-style squelch. Parking it at
-    # EXACTLY 0 builds no envelope node at all, so the knob would then be
-    # next-note-on only -- a pot never lands there, but that is why.
+    # bipolar on purpose: a NEGATIVE amount sweeps the cutoff DOWN while the
+    # key is held, the 303-style squelch. Exactly 0 builds no envelope node
+    # at all, which would make the knob next-note-on only.
     Param("envamt",   patch.fenv_amount, -4000,  6000,  "%.0f",  "fenv_amount"),
     Param("envatk",   patch.fenv_attack,  0.005, 1.0,   "%.3f",  "fenv_attack"),
 
@@ -104,28 +87,24 @@ PARAMS = [
     Param("vibrate",  patch.vib_rate,     0.1,   12.0,  "%.1f",  "vib_rate"),
     Param("vibdepth", patch.vib_depth,    0.0,   0.05,  "%.3f",  "vib_depth"),
 
-    # wave has no objattr: it is an INDEX, not the string synth.wave wants.
-    # vmax is len-1 so a pot at full scale truncates onto the last entry.
+    # wave has no objattr: it is an INDEX, not the string synth.wave wants
     Param("wave",     WAVES.index(patch.wave), 0, len(WAVES) - 1, "%.0f", None),
     Param("detune",   patch.detune,       1.0,   1.01,  "%.3f",  "detune"),
 ]
 # fmt: on
 
-# KNOB_SCALE, not the default KNOB_PICKUP: a turn always moves the
-# value, scaled so knob and value converge and reach the ends
-# together, instead of the pot being dead until it crosses.
+# KNOB_SCALE, not the default KNOB_PICKUP: a turn always moves the value,
+# scaled so knob and value reach the ends together, instead of the pot
+# being dead until it crosses.
 param_set = ParamSet(PARAMS, num_knobs=2, knob_mode=ParamSet.KNOB_SCALE)
 
 
 def apply_param(p):
     """Push one param onto the synth. Two knobs need more than a setattr.
 
-    A discrete parameter selects with round(), not int(). ParamSet
-    deadbands: it stops updating once the knob is within
-    0.1 * min_change * span of the value, so a pot at full scale leaves
-    p.val a hair under vmax. int() truncates that to vmax - 1 and the last
-    choice becomes unreachable; round() also gives every choice an equal
-    band instead of a zero-width one at the top.
+    Discrete params select with round(), not int(): ParamSet's deadband
+    leaves a full-scale knob a hair under vmax, which int() would truncate
+    to vmax - 1, making the last choice unreachable.
     """
     if p.name == "wave":
         synth.wave = WAVES[round(p.val)]  # index -> name string
@@ -140,8 +119,6 @@ def param_text(p):
     return WAVES[round(p.val)] if p.name == "wave" else p.fmt % p.val
 
 
-# Catch a bad objattr or an over-wide name at boot rather than at the page
-# turn that would have shown it. Names are padded to 9 columns on screen.
 for _p in PARAMS:
     if _p.objattr and _p.objattr not in synth._PARAMS:
         raise ValueError("no such synth parameter: '%s'" % _p.objattr)
@@ -173,10 +150,8 @@ def play_pads():
     events = hw.check_touch()
     for ev in events:
         if ev.pressed:
-            # remember the note we actually played, so changing octave
-            # while a pad is down still releases the right one. Notes
-            # already sounding are not re-pitched -- like a keyboard,
-            # they ring out where they were pressed.
+            # remember the note actually played, so changing octave while a
+            # pad is down still releases the right one
             note = base_note + ev.key_number
             held[ev.key_number] = note
             synth.note_on(note, VELOCITY)
@@ -223,7 +198,7 @@ while True:
     if now - last_ui > UI_INTERVAL:
         last_ui = now
         update_ui()
-        # not on a pass that just built a voice -- see the header
+        # not on a pass that just built a voice
         if ui.dirty and not touched:
             display.refresh()
             ui.dirty = False

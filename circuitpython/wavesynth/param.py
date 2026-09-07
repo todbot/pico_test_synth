@@ -13,10 +13,7 @@ when the Param is changed.
 A `ParamChoice` is a Param with a list of options to choose from and
 a setter function to update when the Param is changed.
 
-Part of synthtools; vendored here as a flat module.
-synthtools/ui/ has no __init__.py and is not shipped by
-`circup install synthtools`, so it cannot be imported as
-synthtools.ui.* on-device. Keep in sync by hand.
+Local to wavesynth: synthtools.Param is a different API, not this one.
 
 """
 

@@ -9,27 +9,24 @@
 #
 #     from pico_test_synth.ui import SynthUI
 #
-# Shows the two params the pots are currently editing, as name + value +
-# bar, plus a footer with the page number and the octave.
-#
 #     ui = SynthUI(display, param_set, param_text)
 #     if ui.update("C3"):        # True if anything on screen changed
 #         display.refresh()
 #
-# Everything here is built once. update() only mutates label text and bar
-# widths, comparing before updating the display.
-# Assigning Label.text re-renders the glyph bitmap and marks the region dirty
-# even when the string is identical, so a screen that isn't changing sends
-# no bytes at all.
+# Shows the two params the pots are currently editing, as name + value +
+# bar, plus a footer with the page number and the octave.
+#
+# Everything is built once, and update() compares before assigning: doing
+# so re-renders the glyph bitmap and dirties the region even when the
+# string is identical, so an unchanging screen sends no bytes at all.
 #
 # Two layout rules keep the cost down when something DOES change:
 #
-#   * The SSD1306 is addressed in 8-row pages, and displayio rounds every
-#     dirty rectangle out to a page boundary. So each element is aligned to
-#     one -- a label whose 12 rows straddle three pages costs 50% more than
-#     one that fits in two. terminalio.FONT is exactly 6x12 with ascent 10,
-#     so a Label's top row is `y - 5*scale`; the y values below are chosen
-#     from that.
+#   * The SSD1306 is addressed in 8-row pages and displayio rounds every
+#     dirty rectangle out to a page boundary, so each element is aligned to
+#     one -- a label straddling three pages costs 50% more than one fitting
+#     in two. terminalio.FONT is 6x12 with ascent 10, so a Label's top row
+#     is `y - 5*scale`; the y values below come from that.
 #   * Nothing is wider than one 64px column, so the biggest single transfer
 #     is one scale-2 value label: 60px x 24 rows = 180 bytes, ~1.6 ms.
 
@@ -68,10 +65,9 @@ class SynthUI(displayio.Group):
         #: sticky: set by update(), cleared by whoever calls display.refresh()
         self.dirty = True
         # Last (param, value) drawn per column, and the state behind the
-        # footer string. update() compares these BEFORE formatting
-        # anything: two comparisons are free, "%.0f" % val and a footer
-        # join are not. Measured on an rp2040 at 200 MHz, formatting
-        # unconditionally cost 2.9 ms on every idle pass.
+        # footer. Compared BEFORE formatting anything: measured on an
+        # rp2040 at 200 MHz, formatting unconditionally cost 2.9 ms on
+        # every idle pass.
         self._seen = [None] * len(COL_X)
         self._seen_foot = None
 
@@ -121,10 +117,8 @@ class SynthUI(displayio.Group):
         changed = False
         for i in range(len(COL_X)):
             p = ps.params[ps.idx * ps.nknobs + i]
-            # The entire cost of an idle pass is decided here. Identity
-            # catches a page turn, the float compare catches a knob move;
-            # anything else costs two comparisons and stops, with no
-            # string formatting and no bar arithmetic.
+            # Identity catches a page turn, the float compare catches a
+            # knob move. Anything else stops here, with no formatting.
             seen = self._seen[i]
             if seen is not None and seen[0] is p and seen[1] == p.val:
                 continue
@@ -140,12 +134,7 @@ class SynthUI(displayio.Group):
                 self.bars[i].width = w
                 changed = True
 
-        # This used to carry "A*"/"A-" pickup marks, telling you which pot
-        # was still dead because it had not yet crossed its parameter.
-        # ParamSet's KNOB_SCALE has no such state -- every turn moves the
-        # value -- so there is nothing to report. Same trick as above: the state
-        # behind the string is cheap to compare, the string is not, so
-        # only build it when that state actually moved.
+        # same trick as above: only build the string when its state moved
         foot = (ps.idx, oct_name)
         if foot != self._seen_foot:
             self._seen_foot = foot

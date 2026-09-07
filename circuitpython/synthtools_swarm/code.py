@@ -8,23 +8,21 @@
 #
 #   circup install -r requirements.txt
 #
-# That pulls the synthtools package and the local lib/pico_test_synth
-# board package, whose optional ui module draws the screen here.
+# That pulls synthtools and the local lib/pico_test_synth board package,
+# whose optional ui module draws the screen here.
 #
 # SwarmSynth stacks up to 8 detuned oscillators on ONE note. It is
 # mono = True, so the 16 pads behave like a pitch ribbon: touching a new
-# one steals the sounding voice and glides to it rather than stacking a
-# chord. That is what keeps it inside synthio's 24-note budget -- eight
-# oscillators is eight Notes, and there is only ever one key down.
+# one steals the sounding voice and glides to it. That is what keeps it
+# inside synthio's 24-note budget -- eight oscillators is eight Notes, and
+# there is only ever one key down.
 #
 #   tap the button   -> next pair of parameters (4 pages)
 #   hold the button  -> next octave
 #   touch a pad      -> play / glide to that note
 #
-# `spread` and `drift` are the two knobs worth turning. Both are in bend
-# units, where 1.0 is an octave -- so 0.01 is about +/-12 cents, and the
-# useful range is small. Drift at 0 is a static chorus; wind it up and the
-# oscillators wander against each other.
+# `spread` and `drift` are the two knobs worth turning. Drift at 0 is a
+# static chorus; wind it up and the oscillators wander against each other.
 
 import time
 
@@ -59,17 +57,14 @@ synth = SwarmSynth(hw.synth, patch)
 synth.glide_time = 0.25  # the ribbon glissando; mono makes this audible
 
 # SwarmSynth divides each note's amplitude by swarm_count so the stack does
-# not clip, which leaves the whole instrument quiet. Make it back up here
-# rather than in the patch -- the mixer is the one gain that does not have
-# to be shared with anything.
+# not clip, which leaves the whole instrument quiet.
 hw.set_volume(0.9)
 
 # --- the 8 parameters, in knob-pair order --------------------------------
 # fmt: off
 PARAMS = [
-    # both in BEND units: 1.0 = one octave, so these ranges are narrow on
-    # purpose. Past ~0.03 of spread it stops being a chorus and starts
-    # being a chord.
+    # both in BEND units, 1.0 = an octave, so the ranges are narrow on
+    # purpose: past ~0.03 of spread it is a chord, not a chorus
     Param("spread",   patch.swarm_spread,  0.0,  0.03,  "%.3f",  "swarm_spread"),
     Param("drift",    patch.swarm_drift,   0.0,  0.02,  "%.3f",  "swarm_drift"),
 
@@ -87,19 +82,15 @@ PARAMS = [
 # fmt: on
 assert len(PARAMS) % 2 == 0, "PARAMS must be even: two knobs per page"
 
-# KNOB_SCALE, not the default KNOB_PICKUP: a turn always moves the
-# value, scaled so knob and value converge and reach the ends
-# together, instead of the pot being dead until it crosses.
+# KNOB_SCALE, not the default KNOB_PICKUP: a turn always moves the value,
+# scaled so knob and value reach the ends together, instead of the pot
+# being dead until it crosses.
 param_set = ParamSet(PARAMS, num_knobs=2, knob_mode=ParamSet.KNOB_SCALE)
 
 
 def apply_param(p):
-    # A discrete parameter selects with round(), not int(). ParamSet
-    # deadbands: it stops updating once the knob is within
-    # 0.1 * min_change * span of the value, so a pot at full scale leaves
-    # p.val a hair under vmax. int() truncates that to vmax - 1 and the last
-    # choice becomes unreachable; round() also gives every choice an equal
-    # band instead of a zero-width one at the top.
+    # round(), not int(): ParamSet's deadband leaves a full-scale knob a
+    # hair under vmax, which int() would truncate to vmax - 1
     if p.name == "wave":
         synth.wave = WAVES[round(p.val)]  # index -> name string
     elif p.name == "count":
@@ -109,10 +100,8 @@ def apply_param(p):
 
 
 def param_text(p):
-    # A discrete param must be FORMATTED the same way apply_param
-    # SELECTS it. "%d" truncates, so a value of 2.99 would print 2
-    # while round() applied 3 -- the screen disagreeing with the
-    # sound, which reads as a synth bug rather than a display one.
+    # round() to match how apply_param selects, or the screen disagrees
+    # with the sound
     if p.name == "wave":
         return WAVES[round(p.val)]
     if p.name == "count":
@@ -154,9 +143,8 @@ def play_pads():
             synth.note_on(note, VELOCITY)
         else:
             note = held.pop(ev.key_number, None)
-            # Only release for real when nothing else is still down --
             # mono stole the voice, so an earlier pad lifting must not cut
-            # off the note a later one is holding.
+            # off the note a later one is holding
             if note is not None and not held:
                 synth.note_off(note)
     return bool(events)

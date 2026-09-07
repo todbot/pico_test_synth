@@ -4,32 +4,16 @@
 # wavesynth -- wavetable polysynth with saveable patches, for
 # pico_test_synth / pico_test_synth2
 #
-# Ported from the vendored synth_tools library onto synthtools:
-#
-#   synth_tools.instrument.PolyWaveSynth -> synthtools.WavetableSynth
-#   synth_tools.patch.Patch              -> synthtools.Patch
-#   synth_tools.patch_saver              -> synthtools.load/save_patches
-#   winterbloom_smolmidi                 -> tmidi
+# A wavetable synth on synthtools' WavetableSynth: WavePos moves within
+# the wavetable and morphs live, WaveSel picks which of the .WAVs in
+# wavetables/, and the two motion knobs (FiltLFO / FiltRate) drive the
+# FILTER LFO.
 #
 # The UI (synthui.py, gauge_cluster.py, param_scaler.py, param.py) stays
-# local: synthtools/ui/ has no __init__.py and is not shipped by
-# `circup install synthtools`, so it cannot be imported on-device.
+# local to this folder.
 #
-# WHAT CHANGED AUDIBLY. The old PolyWaveSynth blended two oscillators
-# (waveA/waveB) with an LFO on the mix. synthtools has no equivalent --
-# SubtractiveSynth is one wave plus detune, WavetableSynth is
-# wave_pos/wave_file -- so this is now purely a wavetable synth, which is
-# what the name and the 12 WAVs in wavetables/ always suggested:
-#
-#   WaveMix  -> WavePos    position within the wavetable, morphs live
-#   WaveSel  -> WaveSel    which .WAV, instead of "osc:SAW/SQU"
-#   WavLFO   -> FiltLFO    the motion knobs now drive the FILTER LFO,
-#   WavRate  -> FiltRate   since there is no wave-mix LFO to drive
-#
-# Patches are read from and written to PATCHES_FILE below -- a NEW file.
-# The old saved_patches.json uses the previous schema (wave_type, waveA,
-# waveB, nested amp_env objects) and is left on disk untouched rather than
-# converted, since the wave fields have no meaning here any more.
+# Patches live in PATCHES_FILE below. The old saved_patches.json uses an
+# incompatible schema and is left on disk untouched.
 #
 # Copy the contents of this folder (including wavetables/) to the
 # CIRCUITPY root, then, from circuitpython/:
@@ -62,9 +46,8 @@ WAVE_DIR = "/wavetables"
 touch_midi_notes = list(range(45, 45 + 16))
 
 print("hardware...")
-# volume=1.0 keeps this booting as loud as it always has -- Hardware
-# now defaults to 0.25, which is kinder to headphones but would show up
-# as the Volume gauge reading 0.25 at startup.
+# not Hardware's headphone-friendly 0.25 default -- the Volume gauge
+# would then read 0.25 at boot
 hw = Hardware(volume=1.0)
 splash_screen(hw.setup_display())
 hw.setup_touch("up")        # "down" for a pico_test_synth1 with a Pico 1
@@ -126,9 +109,8 @@ key_number_to_patch = (1, 0, 2, 0, 3, 4, 0, 5, 0, 6, 0, 7, 8, 0, 9, 0)
 
 patch = patches[0]
 
-# A synthio.Biquad above Nyquist is undefined, and Hardware runs the mixer
-# at 25600 Hz. Set on the SUBCLASS and BEFORE constructing -- the clamp is
-# baked into the shared block graph at build time.
+# a Biquad above Nyquist is undefined; the clamp is baked into the block
+# graph at build time, so this must be set before constructing
 WavetableSynth.FILT_F_MAX = hw.sample_rate * 0.45
 
 synth = WavetableSynth(hw.synth, patch)
@@ -149,10 +131,8 @@ def wave_idx():
 
 # --- the 14 parameters, in gauge order -----------------------------------
 # IMPORTANT: these setters and getters talk to the SYNTH, not the patch.
-# synthtools treats a Patch as inert data -- a property setter never writes
-# back to it -- so reading the patch here would show stale values and
-# saving without synth.save_patch() would store the knob positions the
-# patch was LOADED with. See save_patches_action().
+# synthtools keeps a Patch inert -- a property setter never writes back to
+# it -- so reading the patch here would show stale values.
 params = (
     # Pair 0
     ParamRange("FiltFreq", "filter frequency", synth.filt_f, "%4d", 60, 8000,
@@ -162,7 +142,7 @@ params = (
                setter=lambda x: setattr(synth, "filt_q", x),
                getter=lambda: synth.filt_q),
 
-    # Pair 1 -- was WaveMix / WaveSel over waveA+waveB
+    # Pair 1
     ParamRange("WavePos", "wavetable position", synth.wave_pos, "%1.2f", 0, 8,
                setter=lambda x: setattr(synth, "wave_pos", x),
                getter=lambda: synth.wave_pos),
@@ -187,8 +167,7 @@ params = (
                setter=lambda x: setattr(synth, "fenv_release", x),
                getter=lambda: synth.fenv_release),
 
-    # Pair 4 -- both of these had their getters commented out before, so
-    # the gauges never reflected a loaded patch. They do now.
+    # Pair 4
     ParamRange("FiltEnv", "filter env amount", synth.fenv_amount, "%4d", -4000, 6000,
                setter=lambda x: setattr(synth, "fenv_amount", x),
                getter=lambda: synth.fenv_amount),
@@ -196,7 +175,7 @@ params = (
                 setter=lambda x: setattr(synth, "filt_type", FILTER_TYPES[int(x)]),
                 getter=lambda: FILTER_TYPES.index(synth.filt_type)),
 
-    # Pair 5 -- was the wave-mix LFO, now the filter LFO
+    # Pair 5 -- the filter LFO
     ParamRange("FiltLFO", "filter lfo amount", synth.filt_lfo_amount, "%4d", 0, 4000,
                setter=lambda x: setattr(synth, "filt_lfo_amount", x),
                getter=lambda: synth.filt_lfo_amount),
@@ -226,9 +205,8 @@ def save_patches_action():
     time.sleep(0.2)
     synthui.set_patch_name("Saving...")
     hw.display.refresh()
-    # The knobs wrote the SYNTH, not the patch -- synthtools keeps a Patch
-    # inert on purpose. Without this the file gets the values the patch was
-    # loaded with, and every save is a no-op.
+    # the knobs wrote the SYNTH, not the patch -- without this the file
+    # gets the values the patch was loaded with
     synth.save_patch()
     try:
         save_patches(patches, PATCHES_FILE)
@@ -331,9 +309,6 @@ print("--- pico_test_synth wavesynth ready ---")
 
 
 async def main():
-    # PolyWaveSynth needed an instrument_updater() task to drive its
-    # wave-mix LFO in Python. WavetableSynth has nothing to poll: wave_pos
-    # is written straight into the shared buffer, so that task is gone.
     await asyncio.gather(
         asyncio.create_task(ui_handler()),
         asyncio.create_task(midi_handler()),

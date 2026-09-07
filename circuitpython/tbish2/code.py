@@ -3,20 +3,18 @@
 #
 # tbish2 -- a TB-303-like acid bassline, on synthtools' BasslineSynth
 #
-# The tbish/ demo rebuilt on the library. BasslineSynth is a direct port of
-# tbish/tbish_synth.py, so this is the same instrument with the four
-# "# FIXME how to do this" items in that file's note_on_step() actually
-# done: an accent now raises resonance (accent_q) and cutoff
-# (accent_cutoff) as well as level, and a slide has a real slide_time.
+# The tbish/ demo rebuilt on the library. BasslineSynth ports
+# tbish/tbish_synth.py with that file's four "FIXME" items done: an accent
+# now raises resonance and cutoff as well as level, and a slide has a real
+# slide_time.
 #
 # For a pico_test_synth / pico_test_synth2. Copy code.py, tbish_ui.py
 # and boot.py onto the CIRCUITPY root, then, from circuitpython/:
 #
 #   circup install -r requirements.txt
 #
-# That pulls the synthtools package and the local lib/pico_test_synth
-# board package -- circup installs from a path as readily as from the
-# bundle. tbish2 draws its own screen (tbish_ui.py), so it never imports
+# That pulls synthtools and the local lib/pico_test_synth board package.
+# tbish2 draws its own screen (tbish_ui.py), so it never imports
 # pico_test_synth.ui.
 #
 # NEEDS a build with audiofilters and audiodelays for the drive and delay
@@ -26,11 +24,6 @@
 #   tap the button   -> next pair of parameters (9 pages)
 #   hold the button  -> play / pause (and save the knobs to /tbish2.json)
 #   touch a pad      -> transpose the sequence, -7..+8 semitones
-#
-# The pots use scaled ("catch-up") takeover: a turn ALWAYS moves the
-# value, by an amount scaled so knob and value converge and reach the
-# ends together. No dead travel after a page turn -- see
-# ParamSet.update_knobs_scale() in synthtools.
 
 import os
 import time
@@ -43,10 +36,9 @@ microcontroller.cpu.frequency = 200_000_000
 from pico_test_synth import Hardware
 from synthtools import BasslineSynth, Patch
 
-# Only the 14 names in synthtools/__init__.py's _LAZY map can be imported
-# from the package itself; everything else is a module-path import. The
-# package is lazy on purpose (23 KB of rp2040 RAM against 52 KB eager) --
-# don't "fix" that upstream.
+# Only the 14 names in synthtools/__init__.py's _LAZY map come from the
+# package itself; the rest are module-path imports. Lazy on purpose:
+# 23 KB of rp2040 RAM against 52 KB eager.
 from synthtools.paramset import Param, ParamSet
 from synthtools.step_sequencer import StepSequencer
 from tbish_ui import TBishUI
@@ -87,20 +79,12 @@ STEP_COUNT = len(SEQS[0][0])
 GATE = 0.75  # traditional 303 gate length, as a fraction of a step
 
 # --- the patch -----------------------------------------------------------
-# The classic squelch is a big downward sweep from a bright start. envmod is
-# a FRACTION of filt_f, not a number of Hz, so the sweep tracks the cutoff
+# envmod is a FRACTION of filt_f, not Hz, so the sweep tracks the cutoff
 # knob: 0.75 of 3000 Hz falls to 750, two octaves.
 #
-# The two numbers that decide whether you hear envmod at all are `decay`
-# and the amp envelope's decay:
-#
-#   decay (the FILTER fall) must be SHORTER than the gate, or the sweep is
-#   cut off partway and envmod does far less than its number suggests.
-#   The gate here is 0.75 of a 125 ms step at 120 bpm = 94 ms.
-#
-#   The amp decay must be LONGER, so the note is still loud while the
-#   cutoff falls. Equal times sound like one gesture -- a pluck -- because
-#   loudness and brightness drop together and mask each other.
+# For that sweep to be heard, `decay` (the FILTER fall) must be SHORTER
+# than the gate -- 94 ms here -- and the amp decay LONGER, so the note is
+# still loud while the cutoff falls. Equal times just sound like a pluck.
 # fmt: off
 patch = Patch(
     name="tbish2",
@@ -122,12 +106,10 @@ patch = Patch(
     fx_filter_stages=1,  # a synthio.Note holds ONE Biquad, so the voice
                          # alone is 12 dB/oct; one extra stage makes 24,
                          # where the squelch really lives
-    # The other two STRUCTURAL fx switches. They have to be on here for
-    # the drive and delay knobs below to reach anything -- they build the
-    # effects, and nothing in _PARAMS can turn them on later (a MIDI CC
-    # that rebuilt the chain would silently mute it, since the mixer would
-    # still be playing the old tail).
-    fx_distortion_on=IS_RP2350,  # too expensive on an rp2040; see above
+    # STRUCTURAL: these build the effects, so the drive and delay knobs
+    # below reach nothing unless they are on here, and nothing can turn
+    # them on later.
+    fx_distortion_on=IS_RP2350,  # too expensive on an rp2040
     fx_echo_on=True,
     fx_drive=0.0,
     fx_drive_mix=0.0,
@@ -142,13 +124,9 @@ BasslineSynth.FILT_F_MAX = hw.sample_rate * 0.45
 
 bass = BasslineSynth(hw.synth, patch)
 
-# play() captures object identity at call time, so this has to happen after
-# the fx chain exists -- and again after any STRUCTURAL fx change
-# (fx_filter_stages, fx_distortion_on, fx_echo_on). None of the knobs below
-# is structural, so once is enough here.
-# Hardware.__init__ already played the bare synthesizer into voice 0;
-# this REPLACES that with the effects chain's tail. Without it the whole
-# chain is bypassed and nothing sounds wrong -- it just sounds thin.
+# Replaces the bare synthesizer Hardware.__init__ played into voice 0 with
+# the fx chain's tail; without it the chain is bypassed and the synth just
+# sounds thin. Must be redone after any STRUCTURAL fx change.
 try:
     hw.mixer.voice[0].play(bass.output)
     print("filter: 24 dB/octave (1 extra stage)")
@@ -159,18 +137,13 @@ except ImportError:
 # --- the 18 parameters, in knob-pair order -------------------------------
 # Two pots, so params[0:2] are page 1, params[2:4] page 2, and so on.
 # Adding two more gives a 10th page and nothing else changes.
-#
-# Two of these changed UNITS from tbish, not just name:
-#   decay was a 0-1 fraction of the step; it is now seconds outright.
-#   dtime was 0-1 seconds; fx_delay_ms is milliseconds (max 1000).
 # fmt: off
 PARAMS = [
     Param("cutoff",   patch.filt_f,        100,  5000,  "%4d",   "filt_f"),
     Param("envmod",   patch.envmod,        0.0,  1.0,   "%.2f",  "envmod"),
 
-    # 4.0, not 6.0: an accent adds accent_q (up to 2.0) onto this same
-    # shared block, so 4+2 is what actually reaches the filter. 0.6-6 is
-    # the useful span -- see Synth.filt_q.
+    # 4.0, not 6.0: an accent adds up to 2.0 of accent_q on top, and
+    # 0.6-6 is the filter's useful span.
     Param("resQ",     patch.filt_q,        0.6,  4.0,   "%.2f",  "filt_q"),
     Param("decay",    patch.decay,         0.02, 0.40,  "%.2f",  "decay"),
 
@@ -179,14 +152,12 @@ PARAMS = [
     Param("amplevel", patch.amp_level,     0.1,  1.0,   "%.2f",  "amp_level"),
 
     Param("accent",   patch.accent,        0.0,  1.0,   "%.2f",  "accent"),
-    # tbish's "# FIXME: how to do" pair -- both real parameters now
     Param("acctcut",  patch.accent_cutoff, 0,    6000,  "%4d",   "accent_cutoff"),
 
     Param("acctQ",    patch.accent_q,      0.0,  2.0,   "%.2f",  "accent_q"),
     Param("slide",    patch.slide_time,    0.01, 0.25,  "%.2f",  "slide_time"),
 
-    # wave has no objattr: it is an INDEX, not the string bass.wave wants.
-    # vmax is len-1 so a pot at full scale truncates onto the last entry.
+    # wave has no objattr: it is an INDEX, not the string bass.wave wants
     Param("wave",     WAVES.index(patch.wave), 0, len(WAVES) - 1, "%.0f", None),
     Param("drive",    patch.fx_drive,      0.0,  1.0,   "%.2f",  "fx_drive"),
 
@@ -201,25 +172,21 @@ PARAMS = [
     Param("bpm",      120,                 40,   200,   "%3d",   None),
 ]
 # fmt: on
-# One odd param would silently drop off the last page (nknobsets floors),
-# so say so here rather than wondering where "bpm" went.
+# an odd param would silently drop off the last page (nknobsets floors)
 assert len(PARAMS) % 2 == 0, "PARAMS must be even: two knobs per page"
 
-# KNOB_SCALE, not the default KNOB_PICKUP: a turn always moves the
-# value, scaled so knob and value converge and reach the ends
-# together, instead of the pot being dead until it crosses.
+# KNOB_SCALE, not the default KNOB_PICKUP: a turn always moves the value,
+# scaled so knob and value reach the ends together, instead of the pot
+# being dead until it crosses.
 param_set = ParamSet(PARAMS, num_knobs=2, knob_mode=ParamSet.KNOB_SCALE)
 
 
 def apply_param(p):
     """Push one param onto the synth. Not everything is a plain setattr.
 
-    A discrete parameter selects with round(), not int(). ParamSet
-    deadbands: it stops updating once the knob is within
-    0.1 * min_change * span of the value, so a pot at full scale leaves
-    p.val a hair under vmax. int() truncates that to vmax - 1 and the last
-    choice becomes unreachable; round() also gives every choice an equal
-    band instead of a zero-width one at the top.
+    Discrete params select with round(), not int(): ParamSet's deadband
+    leaves a full-scale knob a hair under vmax, which int() would truncate
+    to vmax - 1, making the last choice unreachable.
     """
     if p.name == "wave":
         bass.wave = WAVES[round(p.val)]  # index -> name string
@@ -233,10 +200,8 @@ def apply_param(p):
 
 def param_text(p):
     """Format one param for the screen. Wave shows its name, not its index."""
-    # A discrete param must be FORMATTED the same way apply_param
-    # SELECTS it. "%d" truncates, so a value of 2.99 would print 2
-    # while round() applied 3 -- the screen disagreeing with the
-    # sound, which reads as a synth bug rather than a display one.
+    # round() to match how apply_param selects, or the screen disagrees
+    # with the sound
     if p.name == "wave":
         return WAVES[round(p.val)]
     if p.name == "seq":
@@ -245,9 +210,8 @@ def param_text(p):
 
 
 # --- the sequencer -------------------------------------------------------
-# StepSequencer holds ONE steps list with step_count fixed at construction,
-# so switching pattern means rewriting that list in place. All four
-# patterns are the same length, which is what makes this work.
+# StepSequencer holds ONE steps list of fixed length, so switching pattern
+# means rewriting it in place -- which is why all four are the same length.
 
 
 def on_step(note, vel, gate, on):
@@ -258,8 +222,7 @@ def on_step(note, vel, gate, on):
 
 
 def off_step(note, vel, gate, on):
-    # `note` arrives already transposed: StepSequencer adds transpose
-    # before it calls on_func, and hands off_func back the same tuple.
+    # `note` arrives already transposed -- the same tuple on_func got
     if on and note != 0:
         bass.note_off(note)
 
@@ -274,8 +237,6 @@ def set_seq(n):
         sequencer.steps[i] = [notes[i], vels[i], GATE, True]
 
 
-# Catch a bad objattr or an over-wide name at boot rather than at the page
-# turn that would have shown it. Names are padded to 8 columns on screen.
 for _p in PARAMS:
     if _p.objattr and _p.objattr not in bass._PARAMS:
         raise ValueError("no such synth parameter: '%s'" % _p.objattr)
@@ -306,8 +267,6 @@ def save_params():
         with open(PARAMS_FILE, "w") as f:
             f.write(ParamSet.dump(param_set))
     except OSError:
-        # CIRCUITPY is read-only to the board unless a boot.py remounts it
-        # writable; see wavesynth/boot.py for how.
         print("could not write", PARAMS_FILE, "-- need a boot.py remount")
 
 
@@ -317,10 +276,8 @@ def load_params():
             saved = ParamSet.load(f.read())
     except (OSError, ValueError):
         return  # no saved params yet, or they no longer parse
-    # ParamSet.load() hands back a fresh list of Params rather than
-    # mutating ours, and matches by position. Copy across by NAME instead,
-    # so a saved file from an older PARAMS list restores what it can
-    # rather than smearing values onto the wrong parameters.
+    # ParamSet.load() matches by position; copy by NAME instead, so a file
+    # saved from an older PARAMS list can't smear onto the wrong params.
     by_name = {p.name: p for p in saved}
     for p in PARAMS:
         was = by_name.get(p.name)
@@ -352,9 +309,7 @@ def play_pads():
     events = hw.check_touch()
     for ev in events:
         if ev.pressed:
-            # centred on the middle of the strip, so the pads go DOWN as
-            # well as up -- tbish mapped pad number straight to semitones,
-            # which only ever transposed upward.
+            # centred on the strip, so the pads transpose down as well as up
             sequencer.transpose = ev.key_number - 7
     return bool(events)
 
@@ -369,9 +324,7 @@ def update_ui():
     for p, was in zip(page, before):
         if p.val != was:  # only a real move gets applied
             apply_param(p)
-    # Only while running: StepSequencer.stop() resets .i to 0, which would
-    # otherwise park the dot on the last step instead of leaving it where
-    # playback actually stopped.
+    # stop() resets .i to 0, which would park the dot on the last step
     if sequencer.playing:
         ui.show_beat((sequencer.i - 1) % STEP_COUNT)  # .i already advanced
     ui.update()
