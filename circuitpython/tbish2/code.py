@@ -36,7 +36,6 @@ import os
 import time
 
 import microcontroller
-
 # Do this before any import that allocates. On the original tbish it took
 # per-step latency from 10 ms down to 6 ms.
 microcontroller.cpu.frequency = 200_000_000
@@ -52,12 +51,7 @@ from synthtools.paramset import Param, ParamSet
 from synthtools.step_sequencer import StepSequencer
 from tbish_ui import TBishUI
 
-# tbish/tbish_synth.py:94 says outright "No distortion on rp2040 (not
-# enough CPU)", while the extra filter stage it does afford ("but yes
-# filter on rp2040 with custom compile"). Take it at its word rather than
-# shipping a demo that stutters on half the boards this repo supports --
-# the drive knobs simply do nothing on an rp2040. Same os.uname()[0] test
-# tbish/synth_setup_pts.py:95 used.
+# if we can turn on some extra audio effects
 IS_RP2350 = "rp2350" in os.uname()[0]
 
 HOLD_SECS = 0.7  # button press longer than this is a hold, not a tap
@@ -143,11 +137,6 @@ patch = Patch(
 )
 # fmt: on
 
-# A Biquad above Nyquist is undefined, and Hardware runs at
-# 22.05 kHz, so 9.9 kHz is the ceiling -- not the class default of 20 kHz.
-# filt_f alone reaches 5000 and a full accent adds 4000 on top. Set on the
-# SUBCLASS, and BEFORE construction: the clamp is baked into the block
-# graph at build time.
 hw = Hardware()
 BasslineSynth.FILT_F_MAX = hw.sample_rate * 0.45
 
