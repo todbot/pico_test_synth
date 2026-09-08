@@ -116,8 +116,8 @@ param_set = ParamSet(PARAMS, num_knobs=2, knob_mode=ParamSet.KNOB_SCALE)
 # which is the cap. Must stay in step with PARAMS above.
 # fmt: off
 SECTIONS = (
-    ("OSC",      2),
-    ("FILTER",   2),
+    ("OSC/FILT", 4),
+    #("FILTER",   2),
     ("AMP ENV",  4),
     ("FILT ENV", 4),
     ("FILT LFO", 2),
