@@ -3,16 +3,18 @@
 #
 # synthtools_polysynth -- a playable SubtractiveSynth on pico_test_synth
 #
-# 16 touch pads are a chromatic keyboard, two pots edit 14 synth
-# parameters two at a time, and a 128x64 OLED shows which two.
+# 16 touch pads are a chromatic keyboard, two pots edit 18 synth parameters
+# two at a time, and a 128x64 OLED shows the whole SECTION those two belong
+# to, so attack/decay/sustain/release are on screen together rather than a
+# pair at a time.
 #
-#   tap the button   -> next pair of parameters (7 pages)
+#   tap the button   -> next pair (9 pairs over 7 sections)
 #   hold the button  -> next octave (C2 / C3 / C4)
 #
 # Polyphony: the patch has detune=1.0, so one synthio Note per pad, and all
 # sixteen down still fit synthio's 24-note budget. Turning the detune knob
-# (page 7) up spends TWO Notes per pad, which puts a full hand-spread over
-# the ceiling: audible as dropped notes, not a crash.
+# up spends TWO Notes per pad, which puts a full hand-spread over the
+# ceiling: audible as dropped notes, not a crash.
 
 import time
 
@@ -20,12 +22,12 @@ import microcontroller
 microcontroller.cpu.frequency = 200_000_000
 
 from pico_test_synth import Hardware
-from pico_test_synth.ui import SynthUI
+from pico_test_synth.ui_section import SectionUI
 from synthtools import Patch, SubtractiveSynth
 from synthtools.paramset import Param, ParamSet
 
 UI_INTERVAL = 0.05  # seconds between UI passes (20 Hz)
-HOLD_SECS = 0.7  # button held longer than this = octave, not page
+HOLD_SECS = 0.7  # button held longer than this = octave, not next param
 VELOCITY = 100  # touch pads have no velocity
 # how the pads are wired; a pico_test_synth2 can go either way, see
 # Hardware.setup_touch()
@@ -54,37 +56,53 @@ SubtractiveSynth.FILT_F_MAX = hw.sample_rate * 0.45  # SUBCLASS, before construc
 
 synth = SubtractiveSynth(hw.synth, patch)
 
-# --- the 14 parameters, in knob-pair order -------------------------------
-# Two pots, so params[0:2] are page 1, params[2:4] page 2, and so on.
-# Adding two more gives an 8th page and nothing else changes. Every one is
-# seeded from the patch, so the screen matches what is sounding at boot.
+# --- the 18 parameters, grouped into the sections below ------------------
+# Order here IS the order on screen, and SECTIONS slices it, so the two must
+# stay in step. Every one is seeded from the patch, so the screen matches
+# what is sounding at boot.
 # fmt: off
 PARAMS = [
-    # 60-4000, not the filter's full range: the pot is LINEAR, so a 20 kHz
+    # OSC
+    # wave has no objattr: it is an INDEX, not the string synth.wave wants
+    Param("wave",     WAVES.index(patch.wave), 0, len(WAVES) - 1, "%.0f", None),
+    Param("detune",   patch.detune,       1.0,   1.01,  "%.3f",  "detune"),
+
+    # FILTER
+    # 20-4000, not the filter's full range: the pot is LINEAR, so a 20 kHz
     # top end would bury every useful bass cutoff in the first few percent
     # of travel. The envelope still reaches higher.
     Param("cutoff",   patch.filt_f,       20,    4000,  "%.0f",  "filt_f"),
     Param("reso",     patch.filt_q,       0.6,    6.0,  "%.1f",  "filt_q"),
 
-    # wave has no objattr: it is an INDEX, not the string synth.wave wants
-    Param("wave",     WAVES.index(patch.wave), 0, len(WAVES) - 1, "%.0f", None),
-    Param("detune",   patch.detune,       1.0,   1.01,  "%.3f",  "detune"),
-    
+    # AMP ENV
     Param("attack",   patch.amp_env[0],   0.0,   2.0,   "%.2f",  "attack_time"),
+    Param("decay",    patch.amp_env[1],   0.0,   2.0,   "%.2f",  "decay_time"),
+    Param("sustain",  patch.amp_env[2],   0.0,   1.0,   "%.2f",  "sustain_level"),
     Param("release",  patch.amp_env[3],   0.01,  3.0,   "%.2f",  "release_time"),
 
-    # bipolar on purpose: a NEGATIVE amount sweeps the cutoff DOWN while the
-    # key is held, the 303-style squelch. Exactly 0 builds no envelope node
-    # at all, which would make the knob next-note-on only.
+    # FILT ENV. track lives here rather than with the filter because it is
+    # a fourth modulation of the same cutoff, summed with the others.
+    # envamt is bipolar on purpose: a NEGATIVE amount sweeps the cutoff DOWN
+    # while the key is held, the 303-style squelch. Exactly 0 builds no
+    # envelope node at all, which would make the knob next-note-on only.
     Param("envamt",   patch.fenv_amount, -4000,  6000,  "%.0f",  "fenv_amount"),
     Param("envatk",   patch.fenv_attack,  0.005, 1.0,   "%.3f",  "fenv_attack"),
-
     Param("envrel",   patch.fenv_release, 0.005, 2.0,   "%.2f",  "fenv_release"),
     # also bipolar: negative CLOSES the filter as you play higher
     Param("track",    patch.filt_track,  -1.0,   1.0,   "%+.2f", "filt_track"),
 
+    # FILT LFO, additive: cutoff is the floor and this opens upward from it
+    Param("lforate",  patch.filt_lfo_rate,   0.1,  12.0, "%.1f", "filt_lfo_rate"),
+    Param("lfoamt",   patch.filt_lfo_amount, 0,    4000, "%.0f", "filt_lfo_amount"),
+
+    # VIBRATO
     Param("vibrate",  patch.vib_rate,     0.1,   12.0,  "%.1f",  "vib_rate"),
     Param("vibdepth", patch.vib_depth,    0.0,   0.05,  "%.3f",  "vib_depth"),
+
+    # PITCH ENV, in bend units: 1.0 is an octave, so half an octave either
+    # way is already a big gesture. Bipolar: + starts sharp.
+    Param("penvamt",  patch.penv_amount, -0.5,   0.5,   "%+.2f", "penv_amount"),
+    Param("penvtime", patch.penv_time,    0.005, 1.0,   "%.2f",  "penv_time"),
 ]
 # fmt: on
 
@@ -92,6 +110,21 @@ PARAMS = [
 # scaled so knob and value reach the ends together, instead of the pot
 # being dead until it crosses.
 param_set = ParamSet(PARAMS, num_knobs=2, knob_mode=ParamSet.KNOB_SCALE)
+
+# Each section is a whole number of knob pairs, so a pair never straddles
+# two of them; SectionUI enforces the even counts. Four rows fit the screen,
+# which is the cap. Must stay in step with PARAMS above.
+# fmt: off
+SECTIONS = (
+    ("OSC",      2),
+    ("FILTER",   2),
+    ("AMP ENV",  4),
+    ("FILT ENV", 4),
+    ("FILT LFO", 2),
+    ("VIBRATO",  2),
+    ("PITCH",    2),
+)
+# fmt: on
 
 
 def apply_param(p):
@@ -117,17 +150,17 @@ def param_text(p):
 for _p in PARAMS:
     if _p.objattr and _p.objattr not in synth._PARAMS:
         raise ValueError("no such synth parameter: '%s'" % _p.objattr)
-    if len(_p.name) > 9:
+    if len(_p.name) > 8:
         raise ValueError("param name too wide for the screen: '%s'" % _p.name)
     apply_param(_p)
 
-print("synthtools polysynth: 16 pads, tap button for page, hold for octave")
+print("synthtools polysynth: 16 pads, tap button for pair, hold for octave")
 
 # --- hardware ------------------------------------------------------------
 # setup_display() takes over the screen from the console, so print first.
 display = hw.setup_display()
 hw.setup_touch(TOUCH_PULL)
-ui = SynthUI(display, param_set, param_text)
+ui = SectionUI(display, param_set, SECTIONS, param_text)
 
 held = {}  # pad number -> the midi note actually pressed on it
 oct_i = 1
@@ -158,7 +191,7 @@ def play_pads():
 
 
 def check_button():
-    """Tap = next page, hold = next octave. Decided on release, so no timer."""
+    """Tap = next pair, hold = next octave. Decided on release, so no timer."""
     global press_t, oct_i, base_note
     ev = hw.keys.events.get()
     if not ev:
@@ -176,10 +209,10 @@ def update_ui():
     """Read the pots, push only what moved, redraw only what changed."""
     knobs = hw.read_pots()  # filtered, 0.0-1.0
     i = param_set.idx * param_set.nknobs
-    page = PARAMS[i : i + param_set.nknobs]
-    before = [p.val for p in page]
+    pair = PARAMS[i : i + param_set.nknobs]
+    before = [p.val for p in pair]
     param_set.update_knobs(knobs)  # scaled takeover, always moves
-    for p, was in zip(page, before):
+    for p, was in zip(pair, before):
         if p.val != was:  # only a real move gets applied
             apply_param(p)
     ui.update(oct_name())

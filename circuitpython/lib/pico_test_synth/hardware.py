@@ -150,9 +150,12 @@ class Hardware:
     def setup_display(self):
         """Bring up the 128x64 SSD1306 OLED. Returns it, and sets .display.
 
-        auto_refresh is OFF: a full frame is ~9.5 ms on the wire at I2C
+        auto_refresh is OFF: a full frame is ~31 ms on the wire at I2C
         1 MHz, against an 11.6 ms mixer refill deadline. Refresh
-        deliberately, and only when something actually changed.
+        deliberately, and only when something actually changed. A partial
+        redraw costs ~0.6 ms per dirty region plus ~0.03 ms per byte, so
+        WIDTH is what a layout pays for, not how many elements moved;
+        synthtools' tests/hw/test_display_cost.py measures all of it.
         """
         import adafruit_displayio_ssd1306
         import busio
