@@ -7,7 +7,7 @@ CircuitPython demos for the pico_test_synth and pico_test_synth2 boards.
 * [`wavesynth`](wavesynth/) - wavetable polysynth with 9 saveable patches 
 * [`tbish`](tbish/) - TB-303-like monosynth with step-sequencer
 * [`tbish2`](tbish2/) - TB-303-style acid bassline on `BasslineSynth`, with a step sequencer. Will try to use `audiofilters`/`audiodelays` for fatter sound
-* [`synthtools_polysynth`](synthtools_polysynth/) - 16-pad chromatic polysynth on `SubtractiveSynth`, 18 parameters grouped into 7 named sections, two pots per pair 
+* [`synthtools_polysynth`](synthtools_polysynth/) - 16-pad chromatic polysynth on `SubtractiveSynth`, 18 parameters grouped into 6 named sections, two pots per pair 
 * [`synthtools_arp`](synthtools_arp/) - hold pads, `Arpeggiator` plays them back 
 * [`synthtools_swarm`](synthtools_swarm/) - `SwarmSynth` drone — up to 8 detuned oscillators per note 
 

@@ -62,12 +62,11 @@ synth = SubtractiveSynth(hw.synth, patch)
 # what is sounding at boot.
 # fmt: off
 PARAMS = [
-    # OSC
+    # OSC/FILT
     # wave has no objattr: it is an INDEX, not the string synth.wave wants
     Param("wave",     WAVES.index(patch.wave), 0, len(WAVES) - 1, "%.0f", None),
     Param("detune",   patch.detune,       1.0,   1.01,  "%.3f",  "detune"),
-
-    # FILTER
+    
     # 20-4000, not the filter's full range: the pot is LINEAR, so a 20 kHz
     # top end would bury every useful bass cutoff in the first few percent
     # of travel. The envelope still reaches higher.
@@ -117,7 +116,6 @@ param_set = ParamSet(PARAMS, num_knobs=2, knob_mode=ParamSet.KNOB_SCALE)
 # fmt: off
 SECTIONS = (
     ("OSC/FILT", 4),
-    #("FILTER",   2),
     ("AMP ENV",  4),
     ("FILT ENV", 4),
     ("FILT LFO", 2),
