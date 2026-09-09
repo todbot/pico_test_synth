@@ -6,11 +6,12 @@
 #
 # A wavetable synth on synthtools' WavetableSynth: WavePos moves within
 # the wavetable and morphs live, WaveSel picks which of the .WAVs in
-# wavetables/, and the two motion knobs (FiltLFO / FiltRate) drive the
-# FILTER LFO.
+# wavetables/, and there are two LFOs with an amount and a rate each --
+# FiltLFO/FiltRate over the filter cutoff, WaveLFO/WaveRate sweeping
+# WavePos up through the table.
 #
-# The UI (synthui.py, gauge_cluster.py, param_scaler.py, param.py) stays
-# local to this folder.
+# The UI is lib/pico_test_synth's general two-pot SynthUI; the footer
+# carries the patch name where it used to have its own header line.
 #
 # Patches live in PATCHES_FILE below. The old saved_patches.json uses an
 # incompatible schema and is left on disk untouched.
@@ -23,27 +24,43 @@
 # That pulls synthtools, tmidi, adafruit_wave and the local
 # lib/pico_test_synth that Hardware comes from.
 
+import sys
+if sys.platform == "RP2040":
+    import microcontroller
+    microcontroller.cpu.frequency = 250_000_000
+
 import asyncio
 import os
-import sys
 import time
 
 import tmidi
 import usb_midi
 
-from param import ParamChoice, ParamRange
 from pico_test_synth.hardware import Hardware
+from pico_test_synth.ui import SynthUI
 from synthtools import Patch, WavetableSynth, load_patches, save_patches
-from synthui import SynthUI, splash_screen
-
-if sys.platform == "RP2040":
-    import microcontroller
-
-    microcontroller.cpu.frequency = 250_000_000
+from synthtools.paramset import Param, ParamSet
 
 PATCHES_FILE = "/wavesynth_patches.json"
 WAVE_DIR = "/wavetables"
 touch_midi_notes = list(range(45, 45 + 16))
+
+
+def splash_screen(display):
+    """Boot screen, up until SynthUI takes the display over."""
+    # imported here rather than at the top: nothing else in this program
+    # draws, so the modules are only worth their RAM for this one call
+    import displayio
+    import terminalio
+    from adafruit_display_text import bitmap_label as label
+
+    g = displayio.Group()
+    g.append(label.Label(terminalio.FONT, text="pico_test_synth", color=0xFFFFFF, x=1, y=10))
+    g.append(label.Label(terminalio.FONT, text="wavesynth", color=0xFFFFFF, x=1, y=30, scale=2))
+    g.append(label.Label(terminalio.FONT, text="@todbot", color=0xFFFFFF, x=1, y=50))
+    display.root_group = g
+    display.refresh()
+
 
 print("hardware...")
 # not Hardware's headphone-friendly 0.25 default; the Volume gauge
@@ -117,11 +134,6 @@ synth = WavetableSynth(hw.synth, patch)
 octave = 0  # app state, not a synth parameter
 
 
-def set_octave(v):
-    global octave
-    octave = int(v)
-
-
 def wave_idx():
     try:
         return WAVES.index(synth.wave_file)
@@ -129,82 +141,172 @@ def wave_idx():
         return 0
 
 
-# --- the 14 parameters, in gauge order -----------------------------------
-# IMPORTANT: these setters and getters talk to the SYNTH, not the patch.
-# synthtools keeps a Patch inert (a property setter never writes back to
-# it) so reading the patch here would show stale values.
-params = (
+def wave_top():
+    """Highest legal wave_pos in the file that is loaded right now.
+
+    Per-FILE: selecting a different .WAV changes how many waves there are
+    to move between, so this cannot be worked out once at startup.
+    """
+    return max(synth.num_waves - 1, 1)
+
+
+def sync_wave_ranges():
+    """Re-range the two params that index into the wavetable.
+
+    Called when WaveSel loads a different file: their old maximum may now
+    be off the end of it, and a param left above its own vmax would draw a
+    bar past the end of the track.
+    """
+    top = wave_top()
+    for name in ("WavePos", "WaveLFO"):
+        q = param_set.param_for_name(name)
+        q.vmax = top
+        if q.val > top:
+            q.val = top
+            q.apply_to_obj(synth)
+
+
+# --- the 16 parameters, in knob-pair order -------------------------------
+# Two pots, so PARAMS[0:2] are pair 1, PARAMS[2:4] pair 2, and so on.
+#
+# IMPORTANT: these are seeded from, and written back to, the SYNTH, not the
+# patch. synthtools keeps a Patch inert (a property setter never writes back
+# to it) so reading the patch here would show stale values.
+#
+# Four of them cannot be a plain setattr and so carry no objattr: two are
+# INDEXES into a list of names, and two are not synth parameters at all.
+# apply_param() and read_param() below are the two halves of handling them.
+# fmt: off
+PARAMS = [
     # Pair 0
-    ParamRange("FiltFreq", "filter frequency", synth.filt_f, "%4d", 60, 8000,
-               setter=lambda x: setattr(synth, "filt_f", x),
-               getter=lambda: synth.filt_f),
-    ParamRange("FilterRes", "filter resonance", synth.filt_q, "%1.2f", 0.6, 6.0,
-               setter=lambda x: setattr(synth, "filt_q", x),
-               getter=lambda: synth.filt_q),
+    Param("FiltFreq",  synth.filt_f,          60,   8000,  "%4d",   "filt_f"),
+    Param("FilterRes", synth.filt_q,          0.6,    6.0, "%1.2f", "filt_q"),
 
     # Pair 1
-    ParamRange("WavePos", "wavetable position", synth.wave_pos, "%1.2f", 0, 8,
-               setter=lambda x: setattr(synth, "wave_pos", x),
-               getter=lambda: synth.wave_pos),
-    ParamChoice("WaveSel", "wavetable file", wave_idx(),
-                [w.split("/")[-1].replace(".WAV", "") for w in WAVES],
-                setter=lambda x: setattr(synth, "wave_file", WAVES[int(x)]),
-                getter=wave_idx),
+    Param("WavePos",   synth.wave_pos,        0, wave_top(), "%1.2f", "wave_pos"),
+    Param("WaveSel",   wave_idx(),            0, len(WAVES) - 1, "%.0f", None),
 
-    # Pair 2
-    ParamRange("AmpAtk", "amp attack time", synth.attack_time, "%1.2f", 0.0, 3.0,
-               setter=lambda x: setattr(synth, "attack_time", x),
-               getter=lambda: synth.attack_time),
-    ParamRange("AmpRls", "amp release time", synth.release_time, "%1.2f", 0.0, 3.0,
-               setter=lambda x: setattr(synth, "release_time", x),
-               getter=lambda: synth.release_time),
+    # Pair 2, the wavetable LFO, the WavePos counterpart of pair 5: it
+    # sweeps wave_pos up towards WaveLFO at WaveRate. A ceiling at or below
+    # WavePos means no sweep at all, which is what 0 gives you.
+    Param("WaveLFO",   synth.wave_pos_max,    0, wave_top(), "%1.2f", "wave_pos_max"),
+    Param("WaveRate",  synth.wave_lfo_rate,   0.0,    8.0, "%2.1f", "wave_lfo_rate"),
 
     # Pair 3
-    ParamRange("FiltAtk", "filter env attack", synth.fenv_attack, "%1.2f", 0.01, 3.0,
-               setter=lambda x: setattr(synth, "fenv_attack", x),
-               getter=lambda: synth.fenv_attack),
-    ParamRange("FiltRls", "filter env release", synth.fenv_release, "%1.2f", 0.01, 3.0,
-               setter=lambda x: setattr(synth, "fenv_release", x),
-               getter=lambda: synth.fenv_release),
+    Param("AmpAtk",    synth.attack_time,     0.0,    3.0, "%1.2f", "attack_time"),
+    Param("AmpRls",    synth.release_time,    0.0,    3.0, "%1.2f", "release_time"),
 
     # Pair 4
-    ParamRange("FiltEnv", "filter env amount", synth.fenv_amount, "%4d", -4000, 6000,
-               setter=lambda x: setattr(synth, "fenv_amount", x),
-               getter=lambda: synth.fenv_amount),
-    ParamChoice("FiltType", "filter type", 0, FILTER_TYPES,
-                setter=lambda x: setattr(synth, "filt_type", FILTER_TYPES[int(x)]),
-                getter=lambda: FILTER_TYPES.index(synth.filt_type)),
+    Param("FiltAtk",   synth.fenv_attack,     0.01,   3.0, "%1.2f", "fenv_attack"),
+    Param("FiltRls",   synth.fenv_release,    0.01,   3.0, "%1.2f", "fenv_release"),
 
-    # Pair 5, the filter LFO
-    ParamRange("FiltLFO", "filter lfo amount", synth.filt_lfo_amount, "%4d", 0, 4000,
-               setter=lambda x: setattr(synth, "filt_lfo_amount", x),
-               getter=lambda: synth.filt_lfo_amount),
-    ParamRange("FiltRate", "filter lfo rate", synth.filt_lfo_rate, "%2.1f", 0.0, 8.0,
-               setter=lambda x: setattr(synth, "filt_lfo_rate", x),
-               getter=lambda: synth.filt_lfo_rate),
+    # Pair 5
+    Param("FiltEnv",   synth.fenv_amount,  -4000,   6000,  "%4d",   "fenv_amount"),
+    Param("FiltType",  FILTER_TYPES.index(synth.filt_type),
+                                              0, len(FILTER_TYPES) - 1, "%.0f", None),
+    # Pair 6, the filter LFO
+    Param("FiltLFO",   synth.filt_lfo_amount, 0,   4000,   "%4d",   "filt_lfo_amount"),
+    Param("FiltRate",  synth.filt_lfo_rate,   0.0,    8.0, "%2.1f", "filt_lfo_rate"),
 
-    # Pair 6, neither of these is a synth parameter
-    ParamRange("Octave", "octave range", 0, "%d", -3, 2,
-               setter=set_octave,
-               getter=lambda: octave),
-    ParamRange("Volume", "volume", hw.get_volume(), "%1.2f", 0.1, 1.0,
-               setter=lambda x: hw.set_volume(min(max(x, 0), 1)),
-               getter=hw.get_volume),
-)
+    # Pair 7, neither of these is a synth parameter
+    Param("Octave",    octave,               -2,      2,   "%d",    None),
+    Param("Volume",    hw.get_volume(),       0.1,    1.0, "%1.2f", None),
+]
+# fmt: on
+
+# KNOB_SCALE, not the default KNOB_PICKUP: a turn always moves the value,
+# scaled so knob and value reach the ends together, instead of the pot being
+# dead until it crosses. It also replaces the pre-fix ParamScaler this
+# program used to vendor, which snapped unconditionally and had no deadband.
+param_set = ParamSet(PARAMS, num_knobs=2, knob_mode=ParamSet.KNOB_SCALE)
+
+# what the wavetable files are called, without the path or the extension
+WAVE_NAMES = [w.split("/")[-1].replace(".WAV", "") for w in WAVES]
+
+
+def apply_param(p):
+    """Push one param onto whatever it represents.
+
+    Discrete params select with round(), not int(): ParamSet's deadband
+    leaves a full-scale knob a hair under vmax, which int() would truncate
+    to vmax - 1, making the last choice unreachable.
+    """
+    global octave
+    if p.name == "WaveSel":
+        synth.wave_file = WAVES[round(p.val)]   # index -> full path
+        sync_wave_ranges()                      # a new file, a new wave count
+    elif p.name == "FiltType":
+        synth.filt_type = FILTER_TYPES[round(p.val)]
+    elif p.name == "Octave":
+        octave = round(p.val)
+    elif p.name == "Volume":
+        hw.set_volume(min(max(p.val, 0), 1))
+    else:
+        p.apply_to_obj(synth)                   # plain setattr via p.objattr
+
+
+def read_param(p):
+    """The inverse of apply_param: what does this param represent right now?
+
+    Only loading a patch needs it. The knobs write the synth, so after
+    load_patch() every value has moved and the ParamSet has no idea.
+    """
+    if p.name == "WaveSel":
+        p.val = wave_idx()
+    elif p.name == "FiltType":
+        p.val = FILTER_TYPES.index(synth.filt_type)
+    elif p.name == "Octave":
+        p.val = octave
+    elif p.name == "Volume":
+        p.val = hw.get_volume()
+    elif p.objattr:
+        p.val = getattr(synth, p.objattr)
+
+
+def param_text(p):
+    """Format one param for the screen. The two index params show a name.
+
+    Wavetable names go out in full: SynthUI drops a value longer than five
+    characters to scale 1, which is how the UI this replaced handled them.
+
+    Octave rounds because apply_param does. "%d" truncates towards zero, so
+    without this the number on screen changes at different knob positions
+    from the octave you are actually playing in.
+    """
+    if p.name == "WaveSel":
+        return WAVE_NAMES[round(p.val)]
+    if p.name == "FiltType":
+        return FILTER_TYPES[round(p.val)]
+    if p.name == "Octave":
+        return "%d" % round(p.val)
+    return p.fmt % p.val
 
 
 def update_params():
     """Pull every param's value back from what it represents."""
-    for p in params:
-        p.update()
+    for p in PARAMS:
+        read_param(p)
+
+
+# SynthUI's footer is "P<pair>/<pairs>  <text>", and this is the text: the
+# patch name normally, a status line while saving.
+foot = patch.name
+
+
+def show_footer(text):
+    """Put text in the footer and get it on screen now, not next pass."""
+    global foot
+    foot = text
+    ui.update(foot)
+    hw.display.refresh()
+    ui.dirty = False
 
 
 def save_patches_action():
     v = hw.get_volume()
     hw.set_volume(0)
     time.sleep(0.2)
-    synthui.set_patch_name("Saving...")
-    hw.display.refresh()
+    show_footer("Saving")
     # the knobs wrote the SYNTH, not the patch, without this the file
     # gets the values the patch was loaded with
     synth.save_patch()
@@ -212,7 +314,7 @@ def save_patches_action():
         save_patches(patches, PATCHES_FILE)
     except OSError:
         print("could not write", PATCHES_FILE, "-- is boot.py remounting /?")
-    synthui.set_patch_name(patch.name)
+    show_footer(patch.name)
     hw.set_volume(v)
 
 
@@ -222,16 +324,46 @@ def load_patches_action(patchidx):
     synth.all_notes_off()
     synth.load_patch(patch)
     update_params()  # read the new values back off the synth
-    synthui.set_patch_name(patch.name)
-    synthui.refresh_gauge_cluster()
+    # The pots have not moved but everything under them has. Without this
+    # the next nudge of a knob would snap its param back to where the pot is
+    # sitting and undo that much of the patch.
+    param_set.is_tracking = [False] * param_set.nknobs
+    show_footer(patch.name)
     print("loaded patch #", patchidx)
 
 
 update_params()
-# read_pots() is 0.0-1.0; GaugeCluster and ParamScaler work in 0-255
-knobA, knobB = (v * 255 for v in hw.read_pots())
-synthui = SynthUI(hw.display, params, knobA, knobB)
-synthui.set_patch_name(patch.name)
+for _p in PARAMS:
+    if _p.objattr and _p.objattr not in synth._PARAMS:
+        raise ValueError("no such synth parameter: '%s'" % _p.objattr)
+    if len(_p.name) > 9:
+        raise ValueError("param name too wide for the screen: '%s'" % _p.name)
+ui = SynthUI(hw.display, param_set, param_text)
+
+
+def draw(touched):
+    """Redraw, and put it on the wire only if that changed anything.
+
+    A full frame is ~31 ms against the mixer's 11.6 ms refill deadline, so
+    never on a pass that just built a voice, and never when nothing moved.
+    This program used to refresh unconditionally, every time round the loop.
+    """
+    ui.update(foot)
+    if ui.dirty and not touched:
+        hw.display.refresh()
+        ui.dirty = False
+
+
+def read_knobs():
+    """Read the pots, push only what actually moved onto the synth."""
+    knobs = hw.read_pots()  # filtered, 0.0-1.0
+    i = param_set.idx * param_set.nknobs
+    pair = PARAMS[i : i + param_set.nknobs]
+    before = [p.val for p in pair]
+    param_set.update_knobs(knobs)  # scaled takeover, always moves
+    for p, was in zip(pair, before):
+        if p.val != was:  # only a real move gets applied
+            apply_param(p)
 
 
 async def midi_handler():
@@ -258,14 +390,9 @@ async def ui_handler():
     notes_pressed = [None] * len(hw.touchins)
     button_held = False
     button_with_touch = False
-    p = 0  # which param pair we're looking at
 
     while True:
-        hw.display.refresh()
-
-        knobA, knobB = hw.read_pots()
-        synthui.setA(knobA * 255)
-        synthui.setB(knobB * 255)
+        read_knobs()
 
         if button := hw.check_button():
             if button.pressed:
@@ -273,9 +400,7 @@ async def ui_handler():
             if button.released:
                 # only advance the UI if not doing a patch-load gesture
                 if not button_with_touch:
-                    p = (p + 1) % (synthui.num_params // 2)
-                    synthui.select_pair(p)
-                    print("select param pair:", p)
+                    param_set.next_knobset()
                 button_held = False
                 button_with_touch = False
 
@@ -302,9 +427,15 @@ async def ui_handler():
                         synth.note_off(midi_note)
                         notes_pressed[touch.key_number] = None
                     hw.set_led(0)
+
+        draw(touched=bool(touches))
         await asyncio.sleep(0.01)
 
-
+async def synth_handler():
+    while True:
+        synth.update()
+        await asyncio.sleep(0.01)
+        
 print("--- pico_test_synth wavesynth ready ---")
 
 
@@ -312,6 +443,7 @@ async def main():
     await asyncio.gather(
         asyncio.create_task(ui_handler()),
         asyncio.create_task(midi_handler()),
+        asyncio.create_task(synth_handler()),
     )
 
 
