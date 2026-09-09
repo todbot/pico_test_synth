@@ -28,7 +28,9 @@
 #     in two. terminalio.FONT is 6x12 with ascent 10, so a Label's top row
 #     is `y - 5*scale`; the y values below come from that.
 #   * Nothing is wider than one 64px column, so the biggest single transfer
-#     is one scale-2 value label: 60px x 24 rows = 180 bytes, ~1.6 ms.
+#     is one scale-2 value label: 60px x 24 rows = 180 bytes, ~6 ms measured.
+#     A value too long for that slot drops to scale 1 rather than growing;
+#     see _set_value().
 
 import displayio
 import terminalio
@@ -107,6 +109,26 @@ class SynthUI(displayio.Group):
         lbl.text = text
         return True
 
+    def _set_value(self, i, text):
+        """Write one value, dropping to scale 1 if it will not fit at 2.
+
+        The slot is 60px wide either way: five 12px characters at scale 2,
+        or ten 6px ones at scale 1. Holding the width identical is what
+        keeps a long value from widening the dirty region, and in the
+        right-hand column from running off the screen entirely. Only a
+        text_func returning names rather than numbers can trigger it.
+        """
+        lbl = self.values[i]
+        if len(text) > 5:
+            scale, text = 1, "%10.10s" % text
+        else:
+            scale, text = 2, "%5s" % text
+        changed = False
+        if lbl.scale != scale:
+            lbl.scale = scale
+            changed = True
+        return self._set_text(lbl, text) or changed
+
     def update(self, oct_name=""):
         """Redraw from the ParamSet. Returns True if anything changed.
 
@@ -126,7 +148,7 @@ class SynthUI(displayio.Group):
             # Fixed-width text keeps each label's bitmap the same size from
             # one write to the next, so the dirty region never grows.
             changed |= self._set_text(self.names[i], "%-9s" % p.name)
-            changed |= self._set_text(self.values[i], "%5s" % self.text_func(p))
+            changed |= self._set_value(i, self.text_func(p))
             # vectorio rejects a zero width, so an empty bar is 1 px
             w = int(BAR_W * (p.val - p.vmin) / p.span)
             w = min(max(w, 1), BAR_W)
