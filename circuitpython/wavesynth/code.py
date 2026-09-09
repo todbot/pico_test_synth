@@ -144,11 +144,10 @@ def wave_idx():
 def wave_top():
     """Highest legal wave_pos in the file that is loaded right now.
 
-    Read off the Wavetable because it is per-FILE: selecting a different
-    .WAV changes how many waves there are to move between. There is no
-    public accessor for it on the synth.
+    Per-FILE: selecting a different .WAV changes how many waves there are
+    to move between, so this cannot be worked out once at startup.
     """
-    return max(synth._wavetable.num_waves - 1, 1)
+    return max(synth.num_waves - 1, 1)
 
 
 def sync_wave_ranges():
