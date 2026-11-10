@@ -197,15 +197,23 @@ async def input_handler():
         await asyncio.sleep(0.003)
 
 
+def midi_note_on(channel, note, vel):
+    if vel:
+        note_on(note)
+    else:
+        note_off(note)
+
+def midi_note_off(channel, note, vel):
+    note_off(note)
+
+for port in (midi_usb, midi_uart):
+    port.on(tmidi.NOTE_ON, midi_note_on)
+    port.on(tmidi.NOTE_OFF, midi_note_off)
+
 async def midi_handler():
     while True:
-        while msg := midi_usb.receive() or midi_uart.receive():
-            # tmidi returns one Message type and tags it with .type,
-            # rather than a class per message kind
-            if msg.type == tmidi.NOTE_ON and msg.velocity != 0:
-                note_on(msg.note)
-            elif msg.type in (tmidi.NOTE_OFF, tmidi.NOTE_ON):
-                note_off(msg.note)
+        midi_usb.poll()
+        midi_uart.poll()
         await asyncio.sleep(0.001)
 
 

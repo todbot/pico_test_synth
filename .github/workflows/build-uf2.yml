@@ -1,0 +1,77 @@
+name: Build CircuitPython app UF2s
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to attach the UF2s to (blank: artifact only)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+env:
+  BOARDS: raspberry_pi_pico raspberry_pi_pico2
+  APPS: >-
+    hwtest wavesynth tbish tbish2 synth1
+    synthtools_polysynth synthtools_arp synthtools_swarm
+  PICOTOOL_TAG: v2.3.1-0
+  PICOTOOL_TGZ: picotool-2.3.1-x86_64-lin.tar.gz
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libusb-1.0-0
+          pip install circup folder2uf2==0.1.2
+          gh release download "$PICOTOOL_TAG" -R raspberrypi/pico-sdk-tools \
+            -p "$PICOTOOL_TGZ" -D /tmp
+          tar xzf "/tmp/$PICOTOOL_TGZ" -C /tmp
+          echo /tmp/picotool >> "$GITHUB_PATH"
+
+      # newest first; 11.x may only have prereleases so far, so they count
+      - name: Find latest CircuitPython 11.x
+        run: |
+          ver=$(gh api repos/adafruit/circuitpython/releases \
+            --jq '.[].tag_name' | grep '^11\.' | head -1)
+          [ -n "$ver" ] || { echo "no 11.x release found"; exit 1; }
+          echo "CP_VERSION=$ver" >> "$GITHUB_ENV"
+          echo "CircuitPython $ver"
+
+      - name: Build UF2s
+        run: |
+          mkdir -p dist fw
+          for board in $BOARDS; do
+            fw="fw/adafruit-circuitpython-$board-en_US-$CP_VERSION.uf2"
+            curl -fsSL -o "$fw" \
+              "https://downloads.circuitpython.org/bin/$board/en_US/$(basename "$fw")"
+            for app in $APPS; do
+              python3 circuitpython/make_uf2.py "$fw" "circuitpython/$app" \
+                -o "dist/pico_test_synth-$app-$board-cp$CP_VERSION.uf2"
+            done
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pico_test_synth-uf2s
+          path: dist/*.uf2
+
+      - name: Attach to release
+        if: github.event_name == 'release' || inputs.tag != ''
+        run: |
+          tag="${{ github.event.release.tag_name || inputs.tag }}"
+          gh release upload "$tag" dist/*.uf2 --clobber

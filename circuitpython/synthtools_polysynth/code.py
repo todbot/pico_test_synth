@@ -11,6 +11,9 @@
 #   tap the button   -> next pair (9 pairs over 7 sections)
 #   hold the button  -> next octave (C2 / C3 / C4)
 #
+# MIDI in over USB and TRS plays the synth: CC 1 vibrato depth, CC 74
+# cutoff, CC 120/123 all notes off. Pads send their notes out on both.
+#
 # Polyphony: the patch has detune=1.0, so one synthio Note per pad, and all
 # sixteen down still fit synthio's 24-note budget. Turning the detune knob
 # up spends TWO Notes per pad, which puts a full hand-spread over the
@@ -20,6 +23,9 @@ import time
 
 import microcontroller
 microcontroller.cpu.frequency = 200_000_000
+
+import tmidi
+import usb_midi
 
 from pico_test_synth import Hardware
 from pico_test_synth.ui_section import SectionUI
@@ -158,7 +164,11 @@ print("synthtools polysynth: 16 pads, tap button for pair, hold for octave")
 # setup_display() takes over the screen from the console, so print first.
 display = hw.setup_display()
 hw.setup_touch(TOUCH_PULL)
+hw.setup_midi_uart()
 ui = SectionUI(display, param_set, SECTIONS, param_text)
+
+midi_usb = tmidi.MIDI(midi_in=usb_midi.ports[0], midi_out=usb_midi.ports[1])
+midi_uart = tmidi.MIDI(midi_in=hw.midi_uart, midi_out=hw.midi_uart)
 
 held = {}  # pad number -> the midi note actually pressed on it
 oct_i = 1
@@ -181,11 +191,44 @@ def play_pads():
             note = base_note + ev.key_number
             held[ev.key_number] = note
             synth.note_on(note, VELOCITY)
+            send_midi(tmidi.Message(tmidi.NOTE_ON, note, VELOCITY))
         else:
             note = held.pop(ev.key_number, None)
             if note is not None:
                 synth.note_off(note)
+                send_midi(tmidi.Message(tmidi.NOTE_OFF, note, 0))
     return bool(events)
+
+
+def send_midi(msg):
+    midi_usb.send(msg)
+    midi_uart.send(msg)
+
+
+def midi_note_on(channel, note, vel):
+    if vel:
+        synth.note_on(note, vel)
+    else:
+        synth.note_off(note)
+
+
+def midi_note_off(channel, note, vel):
+    synth.note_off(note)
+
+
+def midi_cc(channel, cc, val):
+    if cc == 1:  # mod wheel -> vibrato depth
+        synth.vib_depth = val / 127 * 0.05
+    elif cc == 74:  # filter cutoff
+        synth.filt_f = 20 + val / 127 * 3980
+    elif cc in (120, 123):
+        synth.all_notes_off()
+
+
+for port in (midi_usb, midi_uart):
+    port.on(tmidi.NOTE_ON, midi_note_on)
+    port.on(tmidi.NOTE_OFF, midi_note_off)
+    port.on(tmidi.CC, midi_cc)
 
 
 def check_button():
@@ -219,6 +262,8 @@ def update_ui():
 while True:
     touched = play_pads()
     check_button()
+    midi_usb.poll()
+    midi_uart.poll()
 
     now = time.monotonic()
     if now - last_ui > UI_INTERVAL:

@@ -1,3 +1,12 @@
+# SPDX-FileCopyrightText: 2026 Tod Kurt
+#
+# SPDX-License-Identifier: MIT
+
+# Python-specific files
+__pycache__
+*.pyc
+
+
 # Ignore list for Eagle, a PCB layout tool
 
 # Backup files
@@ -86,3 +95,7 @@ production
 *.zip
 *.gz
 *.uf2
+
+# tod spew
+*old
+schematics/pico_knobby_synth

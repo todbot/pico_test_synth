@@ -8,7 +8,7 @@
 # the wavetable and morphs live, WaveSel picks which of the .WAVs in
 # wavetables/, and there are two LFOs with an amount and a rate each --
 # FiltLFO/FiltRate over the filter cutoff, WaveLFO/WaveRate sweeping
-# WavePos up through the table.
+# from WavePos up WaveLFO waves through the table.
 #
 # The UI is lib/pico_test_synth's general two-pot SynthUI; the footer
 # carries the patch name where it used to have its own header line.
@@ -187,9 +187,8 @@ PARAMS = [
     Param("WaveSel",   wave_idx(),            0, len(WAVES) - 1, "%.0f", None),
 
     # Pair 2, the wavetable LFO, the WavePos counterpart of pair 5: it
-    # sweeps wave_pos up towards WaveLFO at WaveRate. A ceiling at or below
-    # WavePos means no sweep at all, which is what 0 gives you.
-    Param("WaveLFO",   synth.wave_pos_max,    0, wave_top(), "%1.2f", "wave_pos_max"),
+    # sweeps from wave_pos up WaveLFO waves at WaveRate (0 = off).
+    Param("WaveLFO",   synth.wave_lfo_range,  0, wave_top(), "%1.2f", "wave_lfo_range"),
     Param("WaveRate",  synth.wave_lfo_rate,   0.0,    8.0, "%2.1f", "wave_lfo_rate"),
 
     # Pair 3
@@ -366,23 +365,38 @@ def read_knobs():
             apply_param(p)
 
 
+def midi_note_on(channel, note, vel):
+    if not vel:
+        midi_note_off(channel, note, vel)
+        return
+    synth.note_on(note, vel)
+    hw.set_led(0xFF00FF)
+
+
+def midi_note_off(channel, note, vel):
+    synth.note_off(note)
+    hw.set_led(0x000000)
+
+
+def midi_cc(channel, cc, val):
+    if cc == 74:  # filter cutoff
+        synth.filt_f = 60 + val / 127 * 7940
+    elif cc == 1:  # mod wheel -> wavetable position
+        synth.wave_pos = val / 127 * 8
+    elif cc in (120, 123):
+        synth.all_notes_off()
+
+
+for port in (midi_usb, midi_uart):
+    port.on(tmidi.NOTE_ON, midi_note_on)
+    port.on(tmidi.NOTE_OFF, midi_note_off)
+    port.on(tmidi.CC, midi_cc)
+
+
 async def midi_handler():
     while True:
-        while msg := (midi_usb.receive() or midi_uart.receive()):
-            if msg.type == tmidi.NOTE_ON and msg.velocity:
-                synth.note_on(msg.note, msg.velocity)
-                hw.set_led(0xFF00FF)
-            elif msg.type in (tmidi.NOTE_OFF, tmidi.NOTE_ON):
-                synth.note_off(msg.note)
-                hw.set_led(0x000000)
-            elif msg.type == tmidi.CC:
-                # tmidi names the note bytes but not the CC ones
-                if msg.data0 == 74:  # filter cutoff
-                    synth.filt_f = 60 + msg.data1 / 127 * 7940
-                elif msg.data0 == 1:  # mod wheel -> wavetable position
-                    synth.wave_pos = msg.data1 / 127 * 8
-                elif msg.data0 in (120, 123):
-                    synth.all_notes_off()
+        midi_usb.poll()
+        midi_uart.poll()
         await asyncio.sleep(0.01)
 
 

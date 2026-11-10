@@ -153,13 +153,21 @@ async def synth_updater():
                 n.filter.frequency.scale = filter_freq
         await asyncio.sleep(0.01)
 
+def midi_note_on(channel, note, vel):
+    if vel:
+        note_on(note, vel)
+    else:
+        note_off(note, vel)
+
+def midi_note_off(channel, note, vel):
+    note_off(note, vel)
+
+midi_uart.on(tmidi.NOTE_ON, midi_note_on)
+midi_uart.on(tmidi.NOTE_OFF, midi_note_off)
+
 async def midi_handler():
     while True:
-        while msg := midi_uart.receive():
-            if msg.type == tmidi.NOTE_ON and msg.velocity > 0:
-                note_on(msg.note, msg.velocity)
-            if msg.type == tmidi.NOTE_OFF or msg.type == tmidi.NOTE_ON and msg.velocity ==0:
-                note_off(msg.note, msg.velocity)
+        midi_uart.poll()
         await asyncio.sleep(0.001)
 
 async def screen_updater():
