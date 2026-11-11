@@ -24,11 +24,14 @@
 # `spread` and `drift` are the two knobs worth turning. Drift at 0 is a
 # static chorus; wind it up and the oscillators wander against each other.
 
+import sys
 import time
 
 import microcontroller
 
-microcontroller.cpu.frequency = 200_000_000
+microcontroller.cpu.frequency = (
+    250_000_000 if sys.platform == "RP2040" else 200_000_000
+)
 
 from pico_test_synth import Hardware
 from pico_test_synth.ui import SynthUI

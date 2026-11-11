@@ -19,10 +19,13 @@
 # up spends TWO Notes per pad, which puts a full hand-spread over the
 # ceiling: audible as dropped notes, not a crash.
 
+import sys
 import time
 
 import microcontroller
-microcontroller.cpu.frequency = 200_000_000
+microcontroller.cpu.frequency = (
+    250_000_000 if sys.platform == "RP2040" else 200_000_000
+)
 
 import tmidi
 import usb_midi
@@ -155,7 +158,6 @@ for _p in PARAMS:
         raise ValueError("param name too wide for the screen: '%s'" % _p.name)
     apply_param(_p)
 
-print("synthtools polysynth: 16 pads, tap button for pair, hold for octave")
 
 # --- hardware ------------------------------------------------------------
 # setup_display() takes over the screen from the console, so print first.
@@ -259,6 +261,8 @@ def update_ui():
             apply_param(p)
     ui.update(oct_name())
 
+
+print("--- pico_test_synth polysynth: button tap changes pot edit pair, hold for octave ---")
 
 while True:
     touched = play_pads()

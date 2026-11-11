@@ -25,9 +25,11 @@
 # lib/pico_test_synth that Hardware comes from.
 
 import sys
-if sys.platform == "RP2040":
-    import microcontroller
-    microcontroller.cpu.frequency = 250_000_000
+
+import microcontroller
+microcontroller.cpu.frequency = (
+    250_000_000 if sys.platform == "RP2040" else 200_000_000
+)
 
 import asyncio
 import os

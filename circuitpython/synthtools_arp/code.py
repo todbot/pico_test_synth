@@ -20,13 +20,16 @@
 #   hold the button  -> next octave
 #   hold a pad       -> add its root to the arpeggio
 
+import sys
 import time
 
 import microcontroller
 
 # rp2040 boots at 125 MHz, and reading all 16 touch pads is the biggest
 # thing in the loop (10.9 ms at 125 MHz, 8.2 at 200).
-microcontroller.cpu.frequency = 200_000_000
+microcontroller.cpu.frequency = (
+    250_000_000 if sys.platform == "RP2040" else 200_000_000
+)
 
 from pico_test_synth import Hardware
 from pico_test_synth.ui import SynthUI

@@ -26,12 +26,15 @@
 #   touch a pad      -> transpose the sequence, -7..+8 semitones
 
 import os
+import sys
 import time
 
 import microcontroller
 # Do this before any import that allocates. On the original tbish it took
 # per-step latency from 10 ms down to 6 ms.
-microcontroller.cpu.frequency = 200_000_000
+microcontroller.cpu.frequency = (
+    250_000_000 if sys.platform == "RP2040" else 200_000_000
+)
 
 from pico_test_synth import Hardware
 from synthtools import BasslineSynth, Patch
