@@ -100,7 +100,7 @@ def default_patches():
                 synth_type="wavetable",
                 wave_file=WAVES[i % len(WAVES)],
                 wave_pos=0,
-                wave_lfo_range=2*i,
+                wave_lfo_range=2+(2*i)/2,
                 wave_lfo_rate=0.3,
                 filt_type="LPF",
                 filt_f=2345,
