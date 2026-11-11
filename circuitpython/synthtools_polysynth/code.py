@@ -189,11 +189,13 @@ def play_pads():
             held[ev.key_number] = note
             synth.note_on(note, VELOCITY)
             send_midi(tmidi.Message(tmidi.NOTE_ON, note, VELOCITY))
+            hw.set_led(0xFF00FF)
         else:
             note = held.pop(ev.key_number, None)
             if note is not None:
                 synth.note_off(note)
                 send_midi(tmidi.Message(tmidi.NOTE_OFF, note, 0))
+                hw.set_led(0x000000)
     return bool(events)
 
 
@@ -203,14 +205,16 @@ def send_midi(msg):
 
 
 def midi_note_on(channel, note, vel):
-    if vel:
-        synth.note_on(note, vel)
-    else:
-        synth.note_off(note)
+    if not vel:
+        midi_note_off(channel, note, vel)
+        return
+    synth.note_on(note, vel)
+    hw.set_led(0xFF00FF)
 
 
 def midi_note_off(channel, note, vel):
     synth.note_off(note)
+    hw.set_led(0x000000)
 
 
 def midi_cc(channel, cc, val):
