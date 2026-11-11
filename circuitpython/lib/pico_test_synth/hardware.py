@@ -11,7 +11,7 @@
 #     from pico_test_synth import Hardware
 #     hw = Hardware()                 # audio is running after this
 #     display = hw.setup_display()    # opt-in, see below
-#     hw.setup_touch("up")
+#     hw.setup_touch()                # pull auto-detected
 #
 # The display, the touch pads and the MIDI UART are opt-in: each costs
 # libraries, RAM and pins a given program may not want. Explicit calls
@@ -27,6 +27,7 @@ import audiobusio
 import audiomixer
 import board
 import digitalio
+import displayio
 import keypad
 import pwmio
 import synthio
@@ -112,6 +113,10 @@ class Hardware:
         self.pwr_mode.switch_to_output(value=True)
 
         self.led = pwmio.PWMOut(led_pin)
+        # Must precede keypad.Keys: releasing the display the last run left
+        # behind drops a supervisor tick ref, and if that's keypad's, the
+        # button is never scanned again (CircuitPython 11.0.0-alpha.2).
+        displayio.release_displays()
         self.keys = keypad.Keys((sw_pin,), value_when_pressed=False, pull=True)
 
         self.knobA = analogio.AnalogIn(knobA_pin)
@@ -171,29 +176,56 @@ class Hardware:
         self.display.refresh()
         return self.display
 
-    def setup_touch(self, pull="up"):
+    def setup_touch(self, pull="auto"):
         """Set up the 16 touch pads. Returns the list of TouchIns.
 
         ``pull`` picks the pin's internal resistor, which depends on how
         the pads are wired: a pico_test_synth2 can be either way:
 
+        ``"auto"``
+            the default: on an RP2040 try ``"down"`` then ``"up"``, on an
+            RP2350 only ``"up"``. A wrong guess fails cleanly, as touchio
+            times out waiting for the pad to charge.
         ``"up"``
-            internal pull-up (the default, and the only one that works on
-            an rp2040 with no external resistors)
+            internal pull-up (the only one that works on an rp2040 with
+            no external resistors)
         ``"down"``
             internal pull-down; pico_test_synth1 with a Pico 1
         ``None``
             no internal pull, for pads with their own resistor
         """
+        import os
         import touchio
 
-        pull_type = TOUCH_PULLS[pull]
-        for pin in touch_pins:
-            touchin = touchio.TouchIn(pin, pull_type)
-            touchin.threshold = int(touchin.threshold * 1.1)  # noise protec
-            self.touchins.append(touchin)
-            self._touch_last.append(False)
-        return self.touchins
+        if pull != "auto":
+            pulls = (pull,)
+        elif "rp2350" in os.uname().machine:
+            pulls = ("up",)  # RP2350-E9: its pull-down can't be trusted
+        else:
+            pulls = ("down", "up")
+
+        for p in pulls:
+            print("touch pads: trying pull %s" % p)
+            touchins = []
+            try:
+                for pin in touch_pins:
+                    touchins.append(touchio.TouchIn(pin, TOUCH_PULLS[p]))
+            except ValueError as e:
+                print("touch pads: pull %s failed: %s" % (p, e))
+                for t in touchins:
+                    t.deinit()
+                continue
+            print("touch pads: using pull %s" % p)
+            for touchin in touchins:
+                touchin.threshold = int(touchin.threshold * 1.1)  # noise protec
+                self.touchins.append(touchin)
+                self._touch_last.append(False)
+            return self.touchins
+
+        raise RuntimeError(
+            "touch pads: no pull worked (tried %s); check the pads' resistors"
+            % ", ".join(str(p) for p in pulls)
+        )
 
     def setup_midi_uart(self, baudrate=31250):
         """Bring up the TRS MIDI UART. Returns it, and sets .midi_uart."""

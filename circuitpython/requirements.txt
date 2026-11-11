@@ -1,7 +1,7 @@
 # Libraries needed, installable with:
 #   circup install -r requirements.txt
 #
-# Run it from this directory: the local entry below is a relative path.
+# Run it from this directory: the local entries below are relative paths.
 
 asyncio
 adafruit_wave
@@ -14,8 +14,11 @@ adafruit_display_text
 # 16-pad scan; the single most expensive thing in a typical main loop.
 adafruit_debouncer
 
-# github.com/todbot/CircuitPython_TMIDI
-tmidi
+# github.com/todbot/CircuitPython_TMIDI at 49f5528. A copy of tmidi 3.0
+# until it reaches the bundle; then delete lib/tmidi and use "tmidi".
+# __init__.mpy is mpy-cross'd (mpy v6.3): as .py, compiling it on a Pico
+# fragments the heap enough that wavesynth can't load a wavetable.
+lib/tmidi
 
 # github.com/todbot/CircuitPython_SynthTools -- the synth engine used by
 # tbish2/, synthtools_polysynth/ and the synthtools_* demos.

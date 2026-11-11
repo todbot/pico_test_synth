@@ -251,7 +251,7 @@ print("tbish2: tap button for page, hold to play/pause, pads transpose")
 # --- hardware ------------------------------------------------------------
 # setup_display() takes over the screen from the console, so print first.
 display = hw.setup_display()
-hw.setup_touch("up")
+hw.setup_touch()
 ui = TBishUI(display, param_set, param_text)
 display.root_group = ui
 

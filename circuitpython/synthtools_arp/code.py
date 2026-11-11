@@ -160,7 +160,7 @@ print("synthtools arp: hold pads, tap button for page, hold for octave")
 
 # setup_display() takes over the screen from the console, so print first.
 display = hw.setup_display()
-hw.setup_touch("up")
+hw.setup_touch()
 ui = SynthUI(display, param_set, param_text)
 
 press_t = 0.0

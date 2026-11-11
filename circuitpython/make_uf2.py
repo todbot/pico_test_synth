@@ -12,6 +12,7 @@ If using homebrew:  brew install picotool && pip3 install circup folder2uf2
 import argparse
 import re
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
@@ -23,6 +24,36 @@ FLASH_SIZES = {"rp2040": 2 * 1024 * 1024, "rp2350": 4 * 1024 * 1024}
 FAMILY_IDS = {"rp2040": 0xE48BFF56, "rp2350-arm-s": 0xE48BFF59,
               "rp2350-riscv": 0xE48BFF5A}
 SKIP_NAMES = {"__pycache__", "README.md"}
+UF2_MAGICS = (0x0A324655, 0x9E5D5157)
+UF2_MAGIC_END = 0x0AB16F30
+PAGE, SECTOR = 256, 4096
+
+
+def pad_sectors(uf2_path):
+    """Rewrite a UF2 so every 4K flash sector it touches is whole.
+
+    The RP2040 bootrom re-erases a sector whose blocks straddle two of the
+    host's 8K writes, losing its first pages. Unpadded, a firmware not
+    ending on 4K puts every drive sector there, and CP reformats.
+    """
+    data = uf2_path.read_bytes()
+    pages = {}
+    for i in range(0, len(data), 512):
+        _, _, flags, addr, size, _, _, family = struct.unpack_from(
+            "<8I", data, i)
+        if size != PAGE:
+            sys.exit(f"{uf2_path}: block at {addr:#x} isn't {PAGE} bytes")
+        pages[addr] = data[i + 32 : i + 32 + PAGE]
+    blank = b"\xff" * PAGE
+    sectors = sorted({a - a % SECTOR for a in pages})
+    addrs = [s + p for s in sectors for p in range(0, SECTOR, PAGE)]
+    out = bytearray()
+    for n, addr in enumerate(addrs):
+        out += struct.pack("<8I", *UF2_MAGICS, flags, addr, PAGE, n,
+                           len(addrs), family)
+        out += pages.get(addr, blank).ljust(476, b"\0")
+        out += struct.pack("<I", UF2_MAGIC_END)
+    uf2_path.write_bytes(out)
 
 
 def fw_info(uf2_path):
@@ -121,6 +152,7 @@ def main():
                         "--family-id", hex(FAMILY_IDS[info["family"]]),
                         *(["--full"] if args.full else []),
                         "-o", str(out), str(stage)], check=True)
+        pad_sectors(out)
         print(f"{out}: CircuitPython {info['version']} for {info['board']}")
     finally:
         if args.keep:

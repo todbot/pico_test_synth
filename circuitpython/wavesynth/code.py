@@ -67,7 +67,7 @@ print("hardware...")
 # would then read 0.25 at boot
 hw = Hardware(volume=1.0)
 splash_screen(hw.setup_display())
-hw.setup_touch("up")        # "down" for a pico_test_synth1 with a Pico 1
+hw.setup_touch()
 hw.setup_midi_uart()
 time.sleep(1)  # let USB quiet down (when debugging)
 
@@ -129,6 +129,7 @@ patch = patches[0]
 # a Biquad above Nyquist is undefined; the clamp is baked into the block
 # graph at build time, so this must be set before constructing
 WavetableSynth.FILT_F_MAX = hw.sample_rate * 0.45
+WavetableSynth.WT_PRELOAD = False
 
 synth = WavetableSynth(hw.synth, patch)
 octave = 0  # app state, not a synth parameter

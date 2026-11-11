@@ -119,7 +119,7 @@ for _p in PARAMS:
 print("synthtools swarm: %d oscs, mono=%s" % (synth.swarm_count, synth.mono))
 
 display = hw.setup_display()
-hw.setup_touch("up")
+hw.setup_touch()
 ui = SynthUI(display, param_set, param_text)
 
 held = {}  # pad -> the note it played

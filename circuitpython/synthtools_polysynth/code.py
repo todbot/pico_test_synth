@@ -35,9 +35,6 @@ from synthtools.paramset import Param, ParamSet
 UI_INTERVAL = 0.05  # seconds between UI passes (20 Hz)
 HOLD_SECS = 0.7  # button held longer than this = octave, not next param
 VELOCITY = 100  # touch pads have no velocity
-# how the pads are wired; a pico_test_synth2 can go either way, see
-# Hardware.setup_touch()
-TOUCH_PULL = "up"
 OCTAVES = (36, 48, 60)  # C2, C3, C4: pad 0's note
 # A pot never reads exactly 0, and SubtractiveSynth spends a SECOND Note per
 # key for any detune that isn't exactly 1.0. Without this deadzone every
@@ -163,7 +160,7 @@ print("synthtools polysynth: 16 pads, tap button for pair, hold for octave")
 # --- hardware ------------------------------------------------------------
 # setup_display() takes over the screen from the console, so print first.
 display = hw.setup_display()
-hw.setup_touch(TOUCH_PULL)
+hw.setup_touch()
 hw.setup_midi_uart()
 ui = SectionUI(display, param_set, SECTIONS, param_text)
 
