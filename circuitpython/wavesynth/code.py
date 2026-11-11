@@ -100,6 +100,8 @@ def default_patches():
                 synth_type="wavetable",
                 wave_file=WAVES[i % len(WAVES)],
                 wave_pos=0,
+                wave_lfo_range=2*i,
+                wave_lfo_rate=0.3,
                 filt_type="LPF",
                 filt_f=2345,
                 filt_q=1.1,
@@ -190,7 +192,7 @@ PARAMS = [
     # Pair 2, the wavetable LFO, the WavePos counterpart of pair 5: it
     # sweeps from wave_pos up WaveLFO waves at WaveRate (0 = off).
     Param("WaveLFO",   synth.wave_lfo_range,  0, wave_top(), "%1.2f", "wave_lfo_range"),
-    Param("WaveRate",  synth.wave_lfo_rate,   0.0,    8.0, "%2.1f", "wave_lfo_rate"),
+    Param("WaveRate",  synth.wave_lfo_rate,   0.0,    3.0, "%2.1f", "wave_lfo_rate"),
 
     # Pair 3
     Param("AmpAtk",    synth.attack_time,     0.0,    3.0, "%1.2f", "attack_time"),
